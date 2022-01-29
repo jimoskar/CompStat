@@ -7,24 +7,38 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
-## R Markdown
+# Problem A
+## A.1
+The exponential distribution has cumulative density function (CDF)  
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+$$
+F(x) = 1 - e^{-\lambda x},
+$$
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+with rate parameter $\lambda$. By defining $u := F(x)$, we can express $x$ as 
 
-```{r cars}
-summary(cars)
+$$
+x = -\frac{1}{\lambda}\ln(1-u) =: F^{-1}(u).
+$$
+This means that we can use the \textit{inversion method} to simulate from the exponential distribution. I.e., we let $U \sim \mathcal{U}_{[0,1]}$ and calculate $X = F^{-1}(U)$. Then, $X \sim \mathrm{Exp}(\lambda)$. The function which simulates the exponential distribution is given below.
+
+```{r}
+sim.exp <- function(rate, n){
+  u <- runif(n,0,1)
+  return(-1/rate * log(1 - u))
+}
+```
+Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge.
+```{r}
+rate <- 0.5
+sim <- data.frame(x = sim.exp(rate, 10000))
+x = seq(from = 0, to = 10, by = 0.1)
+exact <- data.frame(x = x, y = rate*exp(-rate*x))
+
+ggplot(sim) + geom_histogram(aes(x = x, y = ..density.., alpha = 0.3), binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y))
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
