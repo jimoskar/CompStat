@@ -3,10 +3,12 @@ title: "TMA4300: Exercise 1"
 author: "Jim Totland, Martin Tufte"
 date: "1/29/2022"
 output: pdf_document
+fig_width: 3
+fig_height: 4
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "center")
 library(tidyverse)
 ```
 
@@ -34,7 +36,7 @@ sim.exp <- function(rate, n){
 Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge.
 ```{r, cache=TRUE}
 rate <- 0.5
-n <- 10000
+n <- 1000
 sim <- data.frame(x = sim.exp(rate, n))
 x = seq(from = 0, to = 15, by = 0.1)
 exact <- data.frame(x = x, y = rate*exp(-rate*x))
@@ -60,7 +62,8 @@ ggplot(sim) +
     label.size = 0.35,
     color = "white",
     fill = "#e0474c"
-  )
+  ) +
+  xlim(0,17)
 ```
 We also compare the estimated mean and variance to first and second central moments of the exponential distribution
 
@@ -81,5 +84,74 @@ data.frame(n.samples = 1:n,
   geom_hline(yintercept = 1/rate^2, color = "red") +
   ggtitle("variance")
 ```
+We observe that the the sampled mean and variance approach the theoretical values as the number of samples grows larger. 
 
+## A.3
+### a)
+To find the value of $c$, we integrate the density over the entire domain and equate the result to 1:
+$$
+1 = \int_{-\infty}^{\infty}f(x)dx = c\int_{-\infty}^{\infty}\frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}dx.
+$$
+To progress from here, we introduce the substitution, $v = e^{\alpha x}$, which gives
+
+$$
+1 = \frac{c}{\alpha} \int_0^{\infty} \frac{dv}{(1 + v)^2} = \frac{c}{\alpha}(-\frac{1}{1 + v})\Big|_0^\infty =\frac{c}{\alpha}.
+$$
+Consequently, $c = \alpha$.
+
+### b)
+The CDF is defined as follows,
+$$
+\begin{split}
+F(x) &= \int_{-\infty}^xf(z)dz =  \int_0^{\exp(\alpha x)} \frac{dv}{(1 + v)^2} \\
+ &= 1-\frac{1}{1 + \exp(\alpha x)} = \frac{\exp(\alpha x)}{1 + \exp(\alpha x)},
+\end{split}
+$$
+
+where we have used the same substitution as earlier, namely $v = e^{\alpha z}$. We notice that $F(x)$ is the Sigmoid function, which has the well known logit-function as its inverse. I.e.,
+$$
+F^{-1}(x) = \frac{1}{\alpha}\ln\left(\frac{x}{1-x}\right).
+$$
+### c)
+
+Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given below.
+
+```{r}
+sim.sigm <- function(alpha, n){
+  u <- runif(n,0,1)
+  return(1/alpha * log(u/(1-u)))
+}
+```
+
+```{r}
+alpha <- 2
+n <- 1000
+sim <- data.frame(x = sim.sigm(alpha, n))
+x = seq(from = -10, to = 10, by = 0.1)
+exact <- data.frame(x = x, y = alpha*exp(alpha*x)/(1 + exp(alpha*x))^2)
+
+ggplot(sim) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  
+```
+
+To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{which remains to be done...}
+```{r}
+# mean
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim$x)/(1:n)) %>%
+  ggplot() + geom_line(aes(n.samples, mean)) +
+  geom_hline(yintercept = 1/rate, color = "red") +
+  ggtitle("mean")
+  
+# variance
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim$x)/(1:n),
+           mean2 = cumsum(sim$x^2)/(1:n)) %>%
+  mutate(var = mean2-mean^2) %>%
+  ggplot() + geom_line(aes(n.samples, var)) +
+  geom_hline(yintercept = 1/rate^2, color = "red") +
+  ggtitle("variance")
+```
 
