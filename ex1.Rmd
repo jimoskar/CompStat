@@ -112,6 +112,7 @@ where we have used the same substitution as earlier, namely $v = e^{\alpha z}$. 
 $$
 F^{-1}(x) = \frac{1}{\alpha}\ln\left(\frac{x}{1-x}\right).
 $$
+
 ### c)
 
 Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given below.
@@ -136,7 +137,7 @@ ggplot(sim) +
   geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  
 ```
 
-To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{which remains to be done...}
+To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}
 ```{r}
 # mean
 data.frame(n.samples = 1:n,
@@ -154,4 +155,62 @@ data.frame(n.samples = 1:n,
   geom_hline(yintercept = 1/rate^2, color = "red") +
   ggtitle("variance")
 ```
+
+## A.4
+Below is our implementation of the Box-Muller algorithm.
+```{r}
+box.mul <- function(n){
+  odd <-  FALSE
+  if(n %% 2 != 0){
+    odd <-  TRUE
+    n <- n + 1
+  }
+  
+  x1 <- runif(n/2, 0, 2*pi)
+  x2 <- sim.exp(0.5, n/2)
+  
+  y1 <- sqrt(x2)*cos(x1)
+  y2 <- sqrt(x2)*sin(x1)
+  
+  concat <- c(y1,y2)
+  if(odd){
+    return(head(concat, -1))
+  }
+  else{
+    return(concat)
+  }
+}
+```
+As usual, we compare the results of a simulation against the theoretical distribution.
+```{r}
+n <- 1000
+sim.box.mul <- data.frame(x = box.mul(n))
+x = seq(from = -5, to = 5, by = 0.1)
+exact <- data.frame(x = x, y = 1/sqrt(2*pi)*exp(-1/2*x^2))
+
+ggplot(sim.box.mul) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  
+```
+Finally, we compare the mean and variance resulting from the simulation with the theoretical values. 
+```{r}
+# mean
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim.box.mul$x)/(1:n)) %>%
+  ggplot() + geom_line(aes(n.samples, mean)) +
+  geom_hline(yintercept = 0, color = "red") +
+  ggtitle("mean")
+  
+# variance
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim.box.mul$x)/(1:n),
+           mean2 = cumsum(sim.box.mul$x^2)/(1:n)) %>%
+  mutate(var = mean2-mean^2) %>%
+  ggplot() + geom_line(aes(n.samples, var)) +
+  geom_hline(yintercept = 1, color = "red") +
+  ggtitle("variance")
+```
+
+
 
