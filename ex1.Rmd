@@ -138,23 +138,6 @@ ggplot(sim) +
 ```
 
 To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}
-```{r}
-# mean
-data.frame(n.samples = 1:n,
-           mean = cumsum(sim$x)/(1:n)) %>%
-  ggplot() + geom_line(aes(n.samples, mean)) +
-  geom_hline(yintercept = 1/rate, color = "red") +
-  ggtitle("mean")
-  
-# variance
-data.frame(n.samples = 1:n,
-           mean = cumsum(sim$x)/(1:n),
-           mean2 = cumsum(sim$x^2)/(1:n)) %>%
-  mutate(var = mean2-mean^2) %>%
-  ggplot() + geom_line(aes(n.samples, var)) +
-  geom_hline(yintercept = 1/rate^2, color = "red") +
-  ggtitle("variance")
-```
 
 ## A.4
 Below is our implementation of the Box-Muller algorithm.
@@ -213,4 +196,65 @@ data.frame(n.samples = 1:n,
 ```
 
 
+## A.5
+
+# Problem B
+## B.1
+### (a)
+
+## B.2
+### (a)
+We repeat that 
+$$
+f^*(x) = \begin{cases} x^{\alpha-1}e^{-x}, \quad &x>0, \\
+0, \quad &\text{otherwise}.
+\end{cases}
+$$
+To find $a = \sqrt{\sup_{x\ge 0} f^*(x)}$, we first note that $f^*(x = 0) = 0$ and only consider
+$$
+\sup_{x > 0} f^*(x),
+$$
+which amounts to solving
+
+$$
+\begin{split}
+\frac{d}{dx} f^*(x)= 0 \\
+&\iff (\alpha-1)x^{\alpha -2}e^{-x} - x^{\alpha -1}e^{-x} = 0 \\
+&\iff x=\alpha-1>0,
+\end{split}
+$$
+which clearly is a global maximum. Consequently,
+$$
+a = \sqrt{\alpha - 1}.
+$$
+
+Analogously, to find  $b_+ = \sqrt{\sup_{x\ge 0} x^2f^*(x)} = \sqrt{\sup_{x\ge 0}g(x)}$, we note that $g(z = 0) = 0$ and only consider $\sup_{x > 0}g(x)$, which amounts to solving
+
+$$
+\begin{split}
+\frac{d}{dx} g(x)= 0 \\
+&\iff (\alpha+1)x^{\alpha}e^{-x} - x^{\alpha + 1}e^{-x} = 0 \\
+&\iff x=\alpha + 1>0,
+\end{split},
+$$
+which clearly is a global maximum for $x \ge 0$. Consequently,
+$$
+b_+ = \sqrt{\alpha + 1}.
+$$
+
+Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{\sup_{x \le 0} g(x)}$
+
+```{r}
+alpha <-  1
+a <-  sqrt(1-alpha)
+b.minus <- 0
+b.plus <- sqrt(alpha + 1)
+
+rou <- function(n, a, b.minus, b.plus){
+  x1 <- runif(n, 0, a)
+  x2 <- runif(n, b.minus, b.plus)
+  
+  return(x2/x1)
+}
+```
 
