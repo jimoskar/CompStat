@@ -334,4 +334,22 @@ sim.gamma <- function(n, alpha, beta){
 Check that it works god:...
 
 ## B.4
+We repeat that $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$, and note that their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$, since they are independent. Next, we define $Z = \frac{X}{X + Y}$ and also introduce $V = X + Y$. Then, $X = ZV$ and $Y=V(1-Z)$, and, by the transformation formula, the joint density of $Z$ and $V$ is
 
+$$
+\begin{split}
+f_{Z, V}(z,v) &= f_{X, Y}(zv, v(1-z)) \cdot \begin{vmatrix} v & z \\
+-v & 1-z\end{vmatrix} \\
+&= (\Gamma(\alpha) \Gamma(\beta))^{-1}\cdot(zv)^{\alpha-1} e^{-zv} \cdot (v(1-z))^{\beta -1}e^{-v(1-z)}\cdot[v(1-z) + vz] \\
+&=(\Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1}\cdot v^{[\alpha + \beta] - 1} \cdot e^{-v}.
+\end{split}
+$$
+Thus, the marginal distribution of $Z$ is given as
+
+$$
+\begin{split}
+\int_0^\infty f_{Z, V}(z,v)dv &= \Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1} \int_0^\infty v^{[\alpha + \beta] - 1} \cdot e^{-v} dv \\
+&= \frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha) \Gamma(\beta)} z^{\alpha-1}(1-z)^{\beta - 1},
+\end{split}
+$$
+which is what we wanted show.
