@@ -124,7 +124,7 @@ G(x) =
 0, & \text{otherwise}
 \end{cases}.
 $$
-The inverse is the unique function $G^{-1}$ such that $x = G^{-1}(u)$. Since $G(x)$ is piecewise continuous and monotonic, we can calculate the inverses for its constituencies and find appropriate intervals. The intervals are simply found from calculating the corresponding boundary points. In $G(x)$ one of these points is located at $x=1$, meaning $G(1) = \frac{c}{\alpha}$ will separate two continuous parts in $G^{-1}$. Simple calculations show that the inverse is given by
+The inverse is the unique function $G^{-1}$ such that $x = G^{-1}(u)$. Since $G(x)$ is piecewise continuous and monotonic, we can calculate the inverses for its constituencies and find appropriate intervals. The intervals are simply found from calculating the corresponding boundary points. In $G(x)$ one of these points is located at $x=1$, meaning $G(1) = \frac{c}{\alpha}$ will separate two continuous parts in $G^{-1}$. After solving for $u$, we end up with the inverse given by
 $$
 G^{-1}(u) =
 \begin{cases}
@@ -183,9 +183,42 @@ ggplot(sim) +
                  alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
   geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
 ```
-From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density.
+From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density. Next we find the theoretical mean and variance and compare with the estimated values. The theoretical mean is given by
+$$
+\mu_g := \int_{-\infty}^{\infty} x\ g(x)\ \text{d}x = c \int_{0}^1 x^{\alpha}\ \text{d}x + c \int_{1}^{\infty} x e^{-x}\ \text{d}x = \frac{c}{\alpha+1} + \frac{2c}{e}.
+$$
+Similarly, we find the variance
+$$
+\begin{split}
+\text{Var}_g & := \int_{-\infty}^{\infty} x^2 f(x)\ \text{d}x - \mu_g^2 \\
+& = c \int_0^1 x^{\alpha + 1}\ \text{d}x + c \int_{1}^{\infty} x^2 e^{-x}\ \text{d}x - \mu_g^2\\
+& = \frac{c}{\alpha+2} + \frac{5c}{e} - \left(\frac{c}{\alpha+1} + \frac{2c}{e}\right)^2.
+\end{split}
+$$
+Comparing the true mean and variance with estimated values:
+```{r}
+alpha <- 0.5
+c <- (1/alpha + exp(-1))^-1
 
-\textcolor{red}{TODO: Calculate the theoretical mean and variance and compare to the sample mean and variance.}
+# 10000 realizations from simulation
+sim <- sim.g(alpha, 10000)
+
+# Theoretical mean and variance
+mean.g <- c/(alpha+1) + 2*c/exp(1)
+var.g <- c/(alpha+2) + 5*c/exp(1) - mean.g^2
+
+# Estimated mean
+mean.est <- mean(sim)
+var.est <- var(sim)
+
+# Comparing means
+c(mean.g, mean.est)
+
+# Comparing variance
+c(var.g, var.est)
+```
+We see that our simulation gives approximate correct values for the theoretical mean and variance.
+
 
 ## A.3
 ### a)
@@ -327,7 +360,7 @@ To test our implementation, we generate a bivariate normal distribution:
 mu <- c(1,2)
 Sigma <- matrix(c(1, -.7, -.7, 2), 2)
 
-# simulate 10000 realizations
+# Simulate 10000 realizations
 y <- sim.mvnorm(mu, Sigma, 10000)
 
 # Plot first 500 points
