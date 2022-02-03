@@ -12,28 +12,32 @@ knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "c
 library(tidyverse)
 ```
 
+
+
 # Problem A
 ## A.1
-The exponential distribution has cumulative density function (CDF)  
+The exponential distribution has a cumulative density function given by
 
 $$
 F(x) = 1 - e^{-\lambda x},
 $$
 
-with rate parameter $\lambda$. By defining $u := F(x)$, we can express $x$ as 
+where $\lambda$ is the rate parameter. By defining $u := F(x)$, $x$ can be expressed as 
 
 $$
 x = -\frac{1}{\lambda}\ln(1-u) =: F^{-1}(u).
 $$
-This means that we can use the \textit{inversion method} to simulate from the exponential distribution. I.e., we let $U \sim \mathcal{U}_{[0,1]}$ and calculate $X = F^{-1}(U)$. Then, $X \sim \mathrm{Exp}(\lambda)$. The function which simulates the exponential distribution is given below.
+This means that we can use the \textit{inversion method} to simulate from the exponential distribution. Let $U \sim \mathcal{U}_{[0,1]}$ and calculate $X = F^{-1}(U)$, then $X \sim \mathrm{Exp}(\lambda)$. A function which simulates from the exponential distribution is given below.
 
 ```{r}
 sim.exp <- function(rate, n){
-  u <- runif(n,0,1)
-  return(-1/rate * log(1 - u))
+  # Vector of n uniform values
+  u <- runif(n, 0, 1)
+  # Note that (1-U) ~ U, so we can use u instead of 1-u in the returned value.
+  -1/rate * log(u)
 }
 ```
-Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge.
+Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge using $\lambda = 0.5$ and $n = 1000$.
 ```{r, cache=TRUE}
 rate <- 0.5
 n <- 1000
@@ -65,17 +69,17 @@ ggplot(sim) +
   ) +
   xlim(0,17)
 ```
-We also compare the estimated mean and variance to first and second central moments of the exponential distribution
+We also compare the estimated mean and variance to first and second central moments of the exponential distribution:
 
 ```{r}
-# mean
+# Calculate the cumulative mean
 data.frame(n.samples = 1:n,
            mean = cumsum(sim$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = 1/rate, color = "red") +
   ggtitle("mean")
   
-# variance
+# Calculate the cumulative variance
 data.frame(n.samples = 1:n,
            mean = cumsum(sim$x)/(1:n),
            mean2 = cumsum(sim$x^2)/(1:n)) %>%
@@ -85,6 +89,103 @@ data.frame(n.samples = 1:n,
   ggtitle("variance")
 ```
 We observe that the the sampled mean and variance approach the theoretical values as the number of samples grows larger. 
+
+
+## A.2
+
+We consider the probability distribution given by
+$$
+g(x) = 
+\begin{cases}
+c x^{\alpha-1}, & 0 < x < 1\\
+ce^{-x}, & 1 \le x\\
+0, & \text{otherwise}
+\end{cases},
+$$
+where $c$ is a normalizing constant and $\alpha \in (0,\ 1)$.
+
+### a)
+Normalizing the density using $\int_{-\infty}^{\infty} g(x)\ \text{d}x = c \int_0^1 x^{\alpha-1}\ \text{d}x + c\int_1^{\infty} e^{-x}\ \text{d}x = c(\frac1\alpha + \frac1e) = 1$, it follows that the normalizing constant is $c = (\frac1\alpha + \frac1e)^{-1}$.
+The cumulative distribution function is given by
+$$
+G(x) = \int_{-\infty}^x g(y)\ \text{d}y =
+\begin{cases}
+c \large\int_0^x y^{\alpha-1}\ \text{d}y, & 0 < x < 1 \\
+\dfrac{c}{\alpha} + c \large\int_1^{x} e^{-y}\ \text{d}y, & 1 \le x \\
+0, & \text{otherwise}
+\end{cases},
+$$
+which evaluates to
+$$
+G(x) =
+\begin{cases}
+\dfrac{cx^\alpha}{\alpha}, & 0 < x < 1 \\
+1 - c e^{-x}, & 1 \le x \\
+0, & \text{otherwise}
+\end{cases}.
+$$
+The inverse is the unique function $G^{-1}$ such that $x = G^{-1}(u)$. Since $G(x)$ is piecewise continuous and monotonic, we can calculate the inverses for its constituencies and find appropriate intervals. The intervals are simply found from calculating the corresponding boundary points. In $G(x)$ one of these points is located at $x=1$, meaning $G(1) = \frac{c}{\alpha}$ will separate two continuous parts in $G^{-1}$. Simple calculations show that the inverse is given by
+$$
+G^{-1}(u) =
+\begin{cases}
+\left(\dfrac{\alpha u}{c}\right)^{-\alpha}, & 0 \le u < \dfrac{c}{\alpha} \\
+-\ln\left(\dfrac{1-u}{c}\right), & \dfrac{c}{\alpha} \le u
+\end{cases}.
+$$
+
+### b)
+Function for generating samples from $g$:
+```{r}
+sim.g <- function(alpha, n){
+  # Normalizing constant
+  c <- (1/alpha + exp(-1))^-1
+  # Vector of n uniform values
+  u <- runif(n, 0, 1)
+  
+  (alpha/c * u)^(1/alpha) * (u < c/alpha) - log((1-u)/c) * (c/alpha <= u)
+}
+```
+
+```{r, echo = FALSE}
+# Implemented for testing purposes
+
+g <- function(alpha, x){
+  # Normalizing constant
+  c <- (1/alpha + exp(-1))^-1
+  c*x^(alpha-1) * (0<x)*(x<1) + c*exp(-x) *(x>=1)
+} 
+
+G <- function(alpha, x){
+  # Normalizing constant
+  c <- (1/alpha + exp(-1))^-1
+  c/alpha*x^alpha * (0<x)*(x<1) + (1 - c*exp(-x)) *(x>=1)
+} 
+
+G.inv <- function(alpha, u){
+  # Normalizing constant
+  c <- (1/alpha + exp(-1))^-1
+  
+  (alpha/c * u)^(1/alpha) * (u < c/alpha) - log((1-u)/c) * (u >= c/alpha)
+}
+```
+
+To test our implementation we use $\alpha = 0.5$ and simulate for $n=1000$.
+
+```{r}
+alpha <- 0.5
+n <- 1000
+sim <- data.frame(x = sim.g(alpha, n))
+x = seq(from = 0.02, to = 5, by = 0.05)
+exact <- data.frame(x = x, y = g(alpha, x))
+
+ggplot(sim) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+```
+From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density.
+
+\textcolor{red}{TODO: Calculate the theoretical mean and variance and compare to the sample mean and variance.}
 
 ## A.3
 ### a)
@@ -120,7 +221,7 @@ Since we have an analytic expression for the inverse, we can again use the \text
 ```{r}
 sim.sigm <- function(alpha, n){
   u <- runif(n,0,1)
-  return(1/alpha * log(u/(1-u)))
+  1/alpha * log(u/(1-u))
 }
 ```
 
@@ -198,6 +299,54 @@ data.frame(n.samples = 1:n,
 
 ## A.5
 
+Let $N_d(\mu, \Sigma)$ be a $d$-variate normal distribution with mean $\mu$ and covariance $\Sigma$. This is our target distribution. To simulate from it, let $x \sim N_d(0,I_d)$ be a standard $d$-variate normal distribution. Then it follows that
+$$
+y = \mu + A x \quad \implies \quad y \sim N(\mu, AA^T),
+$$
+where $A$ is a $d \times d$ matrix. Since the covariance matrix $\Sigma$ is both symmetric and positive-definite, we can write $\Sigma = A A^T$ using the Cholesky decomposition. Thus, for a given $\mu$ and $\Sigma$, we are able to simulate from this distribution after simulating from $N_d(0,I_d)$.
+
+Reusing our implementation of the Box-Muller algorithm from A.4, a function for generating realizations from the target is shown below:
+```{r}
+sim.mvnorm <- function(mu, Sigma, n){
+  # Returns n realizations from a d-variate normal distribution
+  d <- length(mu)
+  
+  # Get n d-variate standard normal realizations using the Box-Muller algorithm
+  x <- array(box.mul(n*d), dim=c(d,n))
+  
+  # Cholesky decomposition of Sigma
+  A <- t(chol(Sigma)) # Transposes to get a lower triangular matrix
+  
+  mu + A %*% x
+}
+```
+
+To test our implementation, we generate a bivariate normal distribution:
+```{r}
+# Bivariate example
+mu <- c(1,2)
+Sigma <- matrix(c(1, -.7, -.7, 2), 2)
+
+# simulate 10000 realizations
+y <- sim.mvnorm(mu, Sigma, 10000)
+
+# Plot first 500 points
+plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", xlab="x", ylab="y", pch=16)
+```
+Comparing the true mean and covariance with estimated values:
+```{r}
+# Estimate mean
+mu.est <- rowMeans(y)
+mu.est
+
+# Estimate covariance matrix
+Sigma.est <- cov(t(y))
+Sigma.est
+```
+From the printout in R, we see that the estimated values are close to the true values $\mu = \begin{pmatrix}1 \\ 2\end{pmatrix}$ and $\Sigma = \begin{pmatrix}1 & -0.7 \\ -0.7 & 2\end{pmatrix}$. This means that our function works properly.
+
+
+\newpage
 # Problem B
 ## B.1
 ### (a)
