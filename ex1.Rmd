@@ -536,10 +536,72 @@ which is what we wanted show.
 
 # Problem C
 ## C.1
-We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f_X(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f_X(x)$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f_X(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f_X(x) = \mathrm{E}[\mathbb{I}(X >4)].$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
 
 $$
-\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X > 4).
+\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X_i > 4).
 $$
-Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$.
+Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$. The estimate is computed below.
+```{r}
+n <- 100000
+x <- box.mul(n)
+h <- (x > 4)
+theta.hat <- 1/n * sum(h)
+theta.hat
+pnorm(4, lower.tail = FALSE)
+```
+
+To compute a confidence interval, we need the variance of $\hat\theta$. We define $h(X) = \mathbb{I}(X  >4 )$
+$$
+\begin{split}
+\mathrm{Var}[\hat\theta] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}[h(X_i)] = \frac{1}{n}\mathrm{Var}[X] \\
+&\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i) - \hat\theta)^2 \right) =: \hat{\sigma}^2.
+\end{split}
+$$
+We also utilize the central limit theorem, such that $\hat\theta \sim \mathcal{N}\left(\theta, \mathrm{Var}[\hat\theta]\right)$. Then we know that
+
+$$
+\frac{\hat{\theta} - \theta}{\hat{\sigma}} \sim t_{n-1}.
+$$
+Consequently, a 95% confidence interval is given by
+
+$$
+\left[\hat{\theta} - t_{n-1, 0.025} \cdot \hat\sigma, \;\hat{\theta} + t_{n-1, 0.025} \cdot \hat\sigma \right].
+$$
+It is computed and displayed below.
+```{r}
+sigma.hat <- sqrt(1/(n*(n-1)) * sum((h - theta.hat)^2)) 
+lower <- theta.hat - qt(0.975, n - 1)*sigma.hat
+upper <- theta.hat + qt(0.975, n - 1)*sigma.hat
+
+c(lower, upper)
+```
+
+## C.2
+To simulate from $g$, we need to find the normalization constant:
+$$
+1 = \int_4^{\infty}g(x)dx = -c\exp\left(-\frac{x^2}{2}\right)\Big|_4^{\infty} \iff c= \exp(8).
+$$
+The CDF, $G(x)$, is thus given as
+$$
+G(x) = \int_4^{x}g(t)dt = 1 - \exp\left(-\frac{x^2}{2} - 8\right).
+$$
+It can easily be shown that $G^{-1}(x) = \sqrt{16-2\ln(1-x)}$, which we utilize in the inversion sampling algorithm below. Sanity check:
+```{r}
+inv.samp <- function(n){
+  u <- runif(n, 0, 1)
+  x <- sqrt(16 - 2*log(1 - u))
+  return(x)
+}
+
+sim <- inv.samp(2000)
+x = seq(from = 4, to = 9, by = 0.1)
+exact <- data.frame(x = x, y = exp(8)*x*exp(-x^2/2))
+
+ggplot(data.frame(x = sim)) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.03) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+```
+
 
