@@ -424,68 +424,66 @@ $$
 b_+ = \sqrt{\alpha + 1}.
 $$
 
-Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{\sup_{x \le 0} g(x)}$
+Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{0} = 0$.
 
 ### (b)
 
 ```{r}
-
-alpha <-  1
-a <-  sqrt(1-alpha)
-b.minus <- 0
-b.plus <- sqrt(alpha + 1)
-
-rou.gamma <- function(n, a, b.minus, b.plus, alpha){
+rou.gamma <- function(n, alpha){
+  a <-  sqrt(alpha - 1)
+  b.minus <- 0
+  b.plus <- sqrt(alpha + 1)
+  
   count <-  0
   tries <- 0
   result <- rep(0,n)
+  
   while(count < n){
-    x1 <- a * runif(1, 0, 1)
-    x2 <- b.minus + b.plus * runif(1, 0, 1) 
-    
+    x1 <- a*runif(1, 0, 1)
+    x2 <- b.minus + b.plus*runif(1, 0, 1) 
+  
     if(log(x1) <= 0.5*((alpha - 1)*log(x2/x1) - x2/x1)){
       result[count + 1] = x2/x1
       count <- count + 1
     }
     tries = tries + 1
   }
-  return(data.frame(sim = result, tries = tries))
+  return(list("sim" = result, "tries" = tries))
 }
 ```
 
 First, we check that the simulation algorithm gives reasonable results:
 ```{r}
-n <- 5000
-alpha <-  3
-a <-  sqrt(alpha - 1)
-b.minus <- 0
-b.plus <- sqrt(alpha + 1)
+n <- 10000
+alpha <-  2
 
-sim.gamma <- rou.gamma(n, a, b.minus, b.plus, alpha)
+sim.gamma <- rou.gamma(n, alpha)
 x = seq(from = 0.1, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
-ggplot(sim.gamma) + 
-  geom_histogram(aes(x = sim, y = ..density..),
+ggplot(data.frame(x = sim.gamma$sim)) + 
+  geom_histogram(aes(x = x, y = ..density..),
                  alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c") 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+sim.gamma$tries
 
 ```
+
 ```{r}
 library(pracma)
 n <- 1000
-alpha.vec <- logseq(1.01, 2000, n = 500)
-trial.vec <- rep(0, 100)
+alpha.vec <- seq(1.01, 2000, length.out = 10)
+tries.vec <- rep(0, 10)
 for(i in 1:length(alpha.vec)){
-  alpha = alpha.vec[i]
-  sim.gamma <- rou.gamma(n, a, b.minus, b.plus, alpha)
-  trial.vec[i] = sim.gamma$tries[1]
+  alpha <- alpha.vec[i]
+  sim.gamma <- rou.gamma(n, alpha)
+  tries.vec[i] = sim.gamma$tries
 }
 
-plot(log(alpha.vec, base = 10), log(trial.vec, base = 10), ylim = c(2.7,4))
+plot(alpha.vec, tries.vec, pch = 16)
 abline(h = 3, col="blue")
 ```
-The number of necessary tries is highest for low values of $\alpha$, and decreases fast, before it stabilizes around $10^{3.2}$. \textcolor{red}{mer tolkning??}
+The number of necessary tries is highest for low values of $\alpha$, i.e. $\ln\alpha < 2$, while it stabilizes after that. This indicates that $C_f$ constitutes a smaller proportion of $[0, a] \times [b_{-},b_{+}]$. \textcolor{red}{mer tolkning?? Tror det er feil. Tror antall tries skal øke med alpha.}
 
 ## B.3
 We recall that the gamma distribution has probability density function (PDF)
@@ -535,3 +533,13 @@ $$
 \end{split}
 $$
 which is what we wanted show.
+
+# Problem C
+## C.1
+We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f_X(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f_X(x)$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+
+$$
+\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X > 4).
+$$
+Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$.
+
