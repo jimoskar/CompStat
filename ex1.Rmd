@@ -10,6 +10,7 @@ fig_height: 4
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "center")
 library(tidyverse)
+set.seed(4300)
 ```
 
 
@@ -536,7 +537,7 @@ which is what we wanted show.
 
 # Problem C
 ## C.1
-We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f_X(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f_X(x) = \mathrm{E}[\mathbb{I}(X >4)].$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x) = \mathrm{E}_f[\mathbb{I}(X >4)]$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
 
 $$
 \hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X_i > 4).
@@ -554,7 +555,7 @@ pnorm(4, lower.tail = FALSE)
 To compute a confidence interval, we need the variance of $\hat\theta$. We define $h(X) = \mathbb{I}(X  >4 )$
 $$
 \begin{split}
-\mathrm{Var}[\hat\theta] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}[h(X_i)] = \frac{1}{n}\mathrm{Var}[X] \\
+\mathrm{Var}[\hat\theta] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}_f[h(X_i)] = \frac{1}{n}\mathrm{Var}_f[h(X)] \\
 &\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i) - \hat\theta)^2 \right) =: \hat{\sigma}^2.
 \end{split}
 $$
@@ -571,6 +572,7 @@ $$
 It is computed and displayed below.
 ```{r}
 sigma.hat <- sqrt(1/(n*(n-1)) * sum((h - theta.hat)^2)) 
+1/sigma.hat^2
 lower <- theta.hat - qt(0.975, n - 1)*sigma.hat
 upper <- theta.hat + qt(0.975, n - 1)*sigma.hat
 
@@ -603,5 +605,77 @@ ggplot(data.frame(x = sim)) +
                  alpha = 0.8, fill = "#69b3a2", binwidth = 0.03) + 
   geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
 ```
+We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??}. Then, in the importance sampling scheme, the estimator is given as
+$$
+\hat\theta_{IS} = \frac{1}{n} \sum_{i = 1}^n\frac{h(X_i)f(X_i)}{g(X_i)} = \frac{1}{n} \sum_{i = 1}^nh(X_i)w(X_i)
+$$
 
+We also note that $w(x) = \left(\sqrt{2\pi}cx\right)^{-1}$ Below we perform the importance sampling
+```{r}
+n <- 100000
+c <- exp(8)
 
+x <- inv.samp(n)
+w <- 1/(sqrt(2*pi)*c*x)
+h <- (x > 4)
+
+theta.is <- 1/n * sum(h*w)
+theta.is
+```
+To create a confidence interval, we need to estimate the variance.
+
+$$
+\begin{split}
+\mathrm{Var}[\hat\theta_{IS}] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}_g[h(X_i)w(X_i)] = \frac{1}{n}\mathrm{Var}_g[h(X)w(X)] \\
+&\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i)w(x_i) - \hat\theta_{IS})^2 \right) =: \hat{\sigma}^2_{IS}.
+\end{split}
+$$
+We use the same procedure as above, which leads to the confidence interval
+$$
+\left[\hat{\theta}_{IS} - t_{n-1, 0.025} \cdot \hat\sigma_{IS}, \;\hat{\theta}_{IS} + t_{n-1, 0.025} \cdot \hat\sigma_{IS} \right].
+$$
+It is computed numerically below.
+```{r}
+sigma.is <- sqrt(1/(n*(n-1)) * sum((h*w - theta.is)^2)) 
+lower <- theta.is - qt(0.975, n - 1)*sigma.is
+upper <- theta.is + qt(0.975, n - 1)*sigma.is
+
+c(lower, upper)
+1/sigma.is^2
+```
+We define the precision of the estimators as the reciprocal of the variance of the estimators. Hence we have $\text{Precision}( \hat{\theta})$ = `r 1/(sigma.hat^2)` and $\text{Precision}(\hat{\theta}_{IS})$ =  `r 1/(sigma.is^2)`. \textcolor{red}{unsure how to compare them with respect to n...}
+
+## C.3
+### (a)
+The algorithm which samples $n$ antithetic from $g$ is given below.
+```{r}
+anti <- function(n){
+  u <- runif(n, 0, 1)
+  q <- c(u, 1 - u)
+  x <- sqrt(16 - 2*log(1 - q))
+  return(x)
+}
+```
+### (b)
+Below, we generate $n = 50000$ pairs of antithetic variates which we use in the importance sampling. We choose $n$ as such because we generate pairs and $2n = 100000$, which is what we used in C.2.
+```{r}
+n <- 100000
+c <- exp(8)
+
+x <- anti(n/2)
+w <- 1/(sqrt(2*pi)*c*x)
+h <- (x > 4)
+
+theta.a <- 1/n * sum(h*w)
+theta.a
+```
+Finally, we compute a 95% confidence interval:
+```{r}
+sigma.a <- sqrt(1/(n*(n-1)) * sum((h*w - theta.a)^2)) 
+lower <- theta.a - qt(0.975, n - 1)*sigma.a
+upper <- theta.a + qt(0.975, n - 1)*sigma.a
+
+c(lower, upper)
+1/sigma.a^2
+```
+We observe that the precision is lower than for regular importance sampling.
