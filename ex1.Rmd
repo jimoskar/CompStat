@@ -535,3 +535,180 @@ $$
 \end{split}
 $$
 which is what we wanted show.
+
+
+\newpage
+# Problem D
+
+## 1.
+We consider a multinomial distribution with mass function given by
+$$
+f(y \mid \theta) \propto (2+\theta)^{y_1}(1-\theta)^{y_2+y_3}\theta^{y_4},
+$$
+where $\theta \in (0,1)$. Using a prior $g(\theta)$ on $(0,1)$, the observed posterior density is $f(\theta\mid y) \propto f(y \mid\theta)\ g(\theta)$. First, let $g(\theta) = \mathcal{U}_{[0,1]}$, i.e. the uniform distribution, which is equivalent to a $\text{Beta}(1,1)$. Then the observed posterior density becomes
+$$
+f(\theta\mid y) \propto f(y \mid\theta)\ \mathcal{U}_{[0,1]} \propto \underbrace{(2+\theta)^{y_1}(1-\theta)^{y_2+y_3}\theta^{y_4}}_{\tilde f(\theta \mid y)} \qquad \text{for}\quad \theta \in (0,1).
+$$
+We can now use rejection sampling to sample from $f(\theta \mid y)$ using the improper density $\tilde f(\theta\mid y)$. For the rejection sampling to work optimally, meaning we want highest possible acceptance rate, it is beneficial to scale the density such that $\text{max}_\theta\ \frac{\tilde f(\theta \mid y)}{\tilde c\ g(\theta)} = 1$, where $\tilde c$ is a constant. When $g(\theta) = \mathcal{U}_{[0,1]}$, the maximum of $\tilde f(\theta\mid y)$ can be found from maximizing its logarithm. Deriving $\ln \tilde f(\theta\mid y)$ with respect to $\theta$ and setting equal to zero, we obtain
+$$
+\frac{\text{d}\ \ln \tilde f(\theta\mid y)}{\text{d}\theta} = \frac{y_1}{2+\theta} - \frac{y_2+y_3}{1-\theta} + \frac{y_4}{\theta} = 0,
+$$
+which on the interval $(0,1)$ has a maximum at
+$$
+\theta^* = \frac{15+\sqrt{53809}}{394} \approx 0.6268,
+$$
+where we used the values for $\{y_i\}_{i=1}^4$ given in the problem description. Next we use this to find the constant $\tilde c = \tilde f(\theta^*\mid y) \approx \exp(67.38)$.
+
+### Rejection sampling algorithm
+1. Sample $\theta$ from the prior distribution $g(\theta)$.
+2. Sample $u$ from the uniform distribution $\mathcal{U}_{[0,1]}$.
+3. Compute $\alpha = \frac{1}{\tilde c} \frac{\tilde f(\theta)}{g(\theta)}$.
+4. If $u \le \alpha$: keep $\theta$. Otherwise do nothing.
+
+```{r}
+# Calculating c
+y <- c(125, 18, 20, 34) # From project description
+theta.star <- (15 + sqrt(53809))/394
+c <- exp(y[1]*log(2+theta.star) + (y[2]+y[3])*log(1-theta.star) + y[4]*log(theta.star))
+
+rej.alg.multiple <- function(n, y=c(125, 18, 20, 34)){
+  # Sample from prior distribution g(theta)
+  theta <- runif(n,0,1)
+  # Sample u from a uniform distribution
+  u <- runif(n,0,1)
+  # Compute alpha
+  f <- (2+theta)^y[1] * (1-theta)^(y[2]+y[3]) * theta^y[4]
+  alpha <- 1/c * f
+  # Accepted samples and acceptance ratio
+  accepted <- theta[u <= alpha]
+  ratio <- length(accepted) / n
+  
+  # Return accepted values and acceptance ratio
+  list(accepted = accepted, ratio = ratio)
+}
+```
+
+## 2.
+We denote the posterior mean of $\theta$ by $\mu_{\theta} = \text{E}(f(\theta\mid y))$. Using Monte-Carlo integration, the mean can be estimated as
+$$
+\hat \mu_{\theta} = \frac1M \sum_{i=1}^M \theta_i,
+$$
+where $\{\theta_i\}_{i=1}^M$ are sampled from the posterior density $f(\theta\mid y)$. To make it easier to calculate, we implement a version of the algorithm given in part (1) which can sample a specified number of samples.
+```{r}
+rej.alg.single <- function(n, y=c(125, 18, 20, 34)){
+  # Store samples
+  samples <- rep(0,n)
+  
+  i = 1
+  while(i<=n){
+    # Sample from prior distribution
+    theta <- runif(1,0,1)
+    # Calculate f
+    f <- (2+theta)^y[1] * (1-theta)^(y[2]+y[3]) * theta^y[4]
+    # Calculate acceptance probability alpha
+    alpha <- 1/c * f
+    
+    # Check if sample is accepted
+    if(runif(1,0,1) <= alpha){
+      samples[i] <- theta
+      i <- i+1
+    }
+  }
+  # Return samples
+  samples
+}
+
+# Making 10000 samples from the posterior distribution
+M <- 10000
+samples <- rej.alg.single(M)
+
+# Monte-Carlo estimate for mean
+mu.theta <- mean(samples)
+mu.theta
+```
+
+Using $M=10000$ samples, Monte-Carlo integration gives the estimate $\hat \mu_{\theta} =$ `r mu.theta`.
+
+```{r}
+sim.rej <- data.frame(x = samples)
+
+# Posterior density (up to a multiplicative constant)
+f <- function(theta, y=c(125, 18, 20, 34)){
+  (2+theta)^y[1] * (1-theta)^(y[2]+y[3]) * theta^y[4]
+}
+
+# Calculating the theoretical density and normalizing
+theta = seq(from = 0, to = 1, by = 0.01)
+norm.const <- integrate(f,0,1)$value
+y <- f(theta) / norm.const
+
+exact <- data.frame(x = theta, y = y)
+
+
+# Histogram + theoretical density + vertical line at estimated mean
+ggplot(sim.rej) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.01) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c") + 
+  geom_vline(xintercept=mu.theta, color="#000000")
+```
+
+Below is an estimate of the mean using numerical integration:
+```{r}
+# Calculating the mean numerically
+mu.num <- integrate(function(x) x*f(x)/norm.const, 0, 1)
+mu.num$value
+```
+We see that the estimate of the mean obtained using Monte Carlo integration, $\hat \mu_{\theta} =$ `r mu.theta`, is close to the numerical value $\hat \mu_{\theta}^{\text{(num)}} =$ `r mu.num$value`.
+
+## 3.
+To get an estimate for how many generations our algorithm needs on average to produce one sample, we can first find the acceptance ratio using Monte-Carlo simulation. Then the average number of samples needed is equal to the inverse of the acceptance ratio. In addition, a numerical estimate can be carried out by integrating $\int_0^1 \frac{\tilde f(\theta\mid y)}{c\ g(\theta)}\ \text{d}\theta$, so we can see if the Monte Carlo estimate gives a reasonable value.
+
+```{r}
+# Estimated acceptance ratio practically
+M <- 10000
+ratio.est <- rej.alg.multiple(M)$ratio
+1/ratio.est
+
+# Numerically calculated acceptance ratio
+ratio.num <- integrate(f,0,1)$value / c
+1/ratio.num
+```
+We see that the average number of generations needed to produce one sample are calculated practically as `r 1/ratio.est` and numerically as `r 1/ratio.num`. The practical estimate is close to the numerical value, as expected.
+
+## 4.
+Now we assume that the prior density is $g(\theta) = \text{Beta}(1,5) = 5(1-\theta)^4$. The new posterior density then becomes
+$$
+f_2(\theta\mid y) \propto f(y \mid\theta)\ 5 (1-\theta)^4 \propto 5 (2+\theta)^{y_1}(1-\theta)^{4+ y_2+y_3}\theta^{y_4} \qquad \text{for}\quad \theta \in (0,1),
+$$
+where we have used the subscript (2) to indicate that this posterior density is different than the one using the uniform distribution. We want to estimate the posterior mean $\mu = \text{E}(\theta\mid y)$ under the new prior density based on the samples obtained in part (2). To do so, we will use importance sampling, where $f_2(\theta\mid y)$ is our target distribution and $f(\theta\mid y)$ is our proposal distribution. An estimate for the posterior mean is thus given as
+$$
+\hat \mu_{\theta, 2} = \text{E}(\theta \mid y) = \frac{\sum_{i=1}^N \theta_i \frac{f_2(\theta_i \mid y)}{f(\theta_i \mid y)}}{\sum_{i=1}^N \frac{f_2(\theta_i \mid y)}{f(\theta_i \mid y)}} = \frac{\sum_{i=1}^N \theta_i w(\theta_i)}{\sum_{i=1}^N w(\theta_i)},
+$$
+where the importance weights are $w(\theta_i) = \frac{f_2(\theta_i\mid y)}{f(\theta_i\mid y)} = 5(1-\theta_i)^4$.
+```{r}
+# Weight function
+w <- function(theta) 5*(1-theta)^4
+
+# Calculate new posterior mean
+mu.theta2 <- sum(samples*w(samples)) / sum(w(samples))
+mu.theta2
+```
+We see that when using the $\text{Beta}(1,5)$ prior, our estimate for the posterior mean $\hat \mu_{\theta,2} =$ `r mu.theta2` is lower than the estimated posterior mean using the uniform prior. The reason for this is that the densities in $\text{Beta}(1,5)$ is higher in the lower end of the interval $(0,1)$, such that samples with lower values of $\theta$ has higher weights and thus contributes more relative to samples with higher values of $\theta$. Intuitively, this in turn means that the estimate must be lower with this method.
+
+In this particular example we see that the uniform prior got an estimate closer to the numerical value than the $\text{Beta}(1,5)$ prior. This highlights the importance of choosing good priors to get reasonable posterior estimates.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
