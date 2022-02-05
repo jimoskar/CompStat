@@ -47,28 +47,11 @@ x = seq(from = 0, to = 15, by = 0.1)
 exact <- data.frame(x = x, y = rate*exp(-rate*x))
 
 ggplot(sim) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  +
-  geom_label(
-    label="Simulated", 
-    x=14,
-    y=0.5,
-    label.padding = unit(0.55, "lines"), # Rectangle size around label
-    label.size = 0.35,
-    color = "white",
-    fill= "#69b3a2"
-  ) +
-  geom_label(
-    label="Exact", 
-    x=14,
-    y=0.42,
-    label.padding = unit(0.55, "lines"), # Rectangle size around label
-    label.size = 0.35,
-    color = "white",
-    fill = "#e0474c"
-  ) +
-  xlim(0,17)
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) 
 ```
 We also compare the estimated mean and variance to first and second central moments of the exponential distribution:
 
