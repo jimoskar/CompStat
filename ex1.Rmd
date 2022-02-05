@@ -10,6 +10,7 @@ fig_height: 4
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "center")
 library(tidyverse)
+set.seed(4300)
 ```
 
 
@@ -46,28 +47,11 @@ x = seq(from = 0, to = 15, by = 0.1)
 exact <- data.frame(x = x, y = rate*exp(-rate*x))
 
 ggplot(sim) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  +
-  geom_label(
-    label="Simulated", 
-    x=14,
-    y=0.5,
-    label.padding = unit(0.55, "lines"), # Rectangle size around label
-    label.size = 0.35,
-    color = "white",
-    fill= "#69b3a2"
-  ) +
-  geom_label(
-    label="Exact", 
-    x=14,
-    y=0.42,
-    label.padding = unit(0.55, "lines"), # Rectangle size around label
-    label.size = 0.35,
-    color = "white",
-    fill = "#e0474c"
-  ) +
-  xlim(0,17)
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) 
 ```
 We also compare the estimated mean and variance to first and second central moments of the exponential distribution:
 
@@ -424,68 +408,66 @@ $$
 b_+ = \sqrt{\alpha + 1}.
 $$
 
-Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{\sup_{x \le 0} g(x)}$
+Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{0} = 0$.
 
 ### (b)
 
 ```{r}
-
-alpha <-  1
-a <-  sqrt(1-alpha)
-b.minus <- 0
-b.plus <- sqrt(alpha + 1)
-
-rou.gamma <- function(n, a, b.minus, b.plus, alpha){
+rou.gamma <- function(n, alpha){
+  a <-  sqrt(alpha - 1)
+  b.minus <- 0
+  b.plus <- sqrt(alpha + 1)
+  
   count <-  0
   tries <- 0
   result <- rep(0,n)
+  
   while(count < n){
-    x1 <- a * runif(1, 0, 1)
-    x2 <- b.minus + b.plus * runif(1, 0, 1) 
-    
+    x1 <- a*runif(1, 0, 1)
+    x2 <- b.minus + b.plus*runif(1, 0, 1) 
+  
     if(log(x1) <= 0.5*((alpha - 1)*log(x2/x1) - x2/x1)){
       result[count + 1] = x2/x1
       count <- count + 1
     }
     tries = tries + 1
   }
-  return(data.frame(sim = result, tries = tries))
+  return(list("sim" = result, "tries" = tries))
 }
 ```
 
 First, we check that the simulation algorithm gives reasonable results:
 ```{r}
-n <- 5000
-alpha <-  3
-a <-  sqrt(alpha - 1)
-b.minus <- 0
-b.plus <- sqrt(alpha + 1)
+n <- 10000
+alpha <-  2
 
-sim.gamma <- rou.gamma(n, a, b.minus, b.plus, alpha)
+sim.gamma <- rou.gamma(n, alpha)
 x = seq(from = 0.1, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
-ggplot(sim.gamma) + 
-  geom_histogram(aes(x = sim, y = ..density..),
+ggplot(data.frame(x = sim.gamma$sim)) + 
+  geom_histogram(aes(x = x, y = ..density..),
                  alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c") 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+sim.gamma$tries
 
 ```
+
 ```{r}
 library(pracma)
 n <- 1000
-alpha.vec <- logseq(1.01, 2000, n = 500)
-trial.vec <- rep(0, 100)
+alpha.vec <- seq(1.01, 2000, length.out = 10)
+tries.vec <- rep(0, 10)
 for(i in 1:length(alpha.vec)){
-  alpha = alpha.vec[i]
-  sim.gamma <- rou.gamma(n, a, b.minus, b.plus, alpha)
-  trial.vec[i] = sim.gamma$tries[1]
+  alpha <- alpha.vec[i]
+  sim.gamma <- rou.gamma(n, alpha)
+  tries.vec[i] = sim.gamma$tries
 }
 
-plot(log(alpha.vec, base = 10), log(trial.vec, base = 10), ylim = c(2.7,4))
+plot(alpha.vec, tries.vec, pch = 16)
 abline(h = 3, col="blue")
 ```
-The number of necessary tries is highest for low values of $\alpha$, and decreases fast, before it stabilizes around $10^{3.2}$. \textcolor{red}{mer tolkning??}
+The number of necessary tries is highest for low values of $\alpha$, i.e. $\ln\alpha < 2$, while it stabilizes after that. This indicates that $C_f$ constitutes a smaller proportion of $[0, a] \times [b_{-},b_{+}]$. \textcolor{red}{mer tolkning?? Tror det er feil. Tror antall tries skal øke med alpha.}
 
 ## B.3
 We recall that the gamma distribution has probability density function (PDF)
@@ -535,6 +517,153 @@ $$
 \end{split}
 $$
 which is what we wanted show.
+
+\newpage
+# Problem C
+## C.1
+We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x) = \mathrm{E}_f[\mathbb{I}(X >4)]$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+
+$$
+\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X_i > 4).
+$$
+Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$. The estimate is computed below.
+```{r}
+n <- 100000
+x <- box.mul(n)
+h <- (x > 4)
+theta.hat <- 1/n * sum(h)
+theta.hat
+pnorm(4, lower.tail = FALSE)
+```
+
+To compute a confidence interval, we need the variance of $\hat\theta$. We define $h(X) = \mathbb{I}(X  >4 )$
+$$
+\begin{split}
+\mathrm{Var}[\hat\theta] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}_f[h(X_i)] = \frac{1}{n}\mathrm{Var}_f[h(X)] \\
+&\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i) - \hat\theta)^2 \right) =: \hat{\sigma}^2.
+\end{split}
+$$
+We also utilize the central limit theorem, such that $\hat\theta \sim \mathcal{N}\left(\theta, \mathrm{Var}[\hat\theta]\right)$. Then we know that
+
+$$
+\frac{\hat{\theta} - \theta}{\hat{\sigma}} \sim t_{n-1}.
+$$
+Consequently, a 95% confidence interval is given by
+
+$$
+\left[\hat{\theta} - t_{n-1, 0.025} \cdot \hat\sigma, \;\hat{\theta} + t_{n-1, 0.025} \cdot \hat\sigma \right].
+$$
+It is computed and displayed below.
+```{r}
+sigma.hat <- sqrt(1/(n*(n-1)) * sum((h - theta.hat)^2)) 
+1/sigma.hat^2
+lower <- theta.hat - qt(0.975, n - 1)*sigma.hat
+upper <- theta.hat + qt(0.975, n - 1)*sigma.hat
+
+c(lower, upper)
+```
+
+## C.2
+To simulate from $g$, we need to find the normalization constant:
+$$
+1 = \int_4^{\infty}g(x)dx = -c\exp\left(-\frac{x^2}{2}\right)\Big|_4^{\infty} \iff c= \exp(8).
+$$
+The CDF, $G(x)$, is thus given as
+$$
+G(x) = \int_4^{x}g(t)dt = 1 - \exp\left(-\frac{x^2}{2} - 8\right).
+$$
+It can easily be shown that $G^{-1}(x) = \sqrt{16-2\ln(1-x)}$, which we utilize in the inversion sampling algorithm below. Sanity check:
+```{r}
+inv.samp <- function(n){
+  u <- runif(n, 0, 1)
+  x <- sqrt(16 - 2*log(1 - u))
+  return(x)
+}
+
+sim <- inv.samp(2000)
+x = seq(from = 4, to = 9, by = 0.1)
+exact <- data.frame(x = x, y = exp(8)*x*exp(-x^2/2))
+
+ggplot(data.frame(x = sim)) + 
+  geom_histogram(aes(x = x, y = ..density..),
+                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.03) + 
+  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+```
+We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??}. Then, in the importance sampling scheme, the estimator is given as
+$$
+\hat\theta_{IS} = \frac{1}{n} \sum_{i = 1}^n\frac{h(X_i)f(X_i)}{g(X_i)} = \frac{1}{n} \sum_{i = 1}^nh(X_i)w(X_i)
+$$
+
+We also note that $w(x) = \left(\sqrt{2\pi}cx\right)^{-1}$ Below we perform the importance sampling
+```{r}
+n <- 100000
+c <- exp(8)
+
+x <- inv.samp(n)
+w <- 1/(sqrt(2*pi)*c*x)
+h <- (x > 4)
+
+theta.is <- 1/n * sum(h*w)
+theta.is
+```
+To create a confidence interval, we need to estimate the variance.
+
+$$
+\begin{split}
+\mathrm{Var}[\hat\theta_{IS}] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}_g[h(X_i)w(X_i)] = \frac{1}{n}\mathrm{Var}_g[h(X)w(X)] \\
+&\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i)w(x_i) - \hat\theta_{IS})^2 \right) =: \hat{\sigma}^2_{IS}.
+\end{split}
+$$
+We use the same procedure as above, which leads to the confidence interval
+$$
+\left[\hat{\theta}_{IS} - t_{n-1, 0.025} \cdot \hat\sigma_{IS}, \;\hat{\theta}_{IS} + t_{n-1, 0.025} \cdot \hat\sigma_{IS} \right].
+$$
+It is computed numerically below.
+```{r}
+sigma.is <- sqrt(1/(n*(n-1)) * sum((h*w - theta.is)^2)) 
+lower <- theta.is - qt(0.975, n - 1)*sigma.is
+upper <- theta.is + qt(0.975, n - 1)*sigma.is
+
+c(lower, upper)
+1/sigma.is^2
+```
+We define the precision of the estimators as the reciprocal of the variance of the estimators. Hence we have $\text{Precision}( \hat{\theta})$ = `r 1/(sigma.hat^2)` and $\text{Precision}(\hat{\theta}_{IS})$ =  `r 1/(sigma.is^2)`. \textcolor{red}{unsure how to compare them with respect to n...}
+
+## C.3
+### (a)
+The algorithm which samples $n$ antithetic from $g$ is given below.
+```{r}
+anti <- function(n){
+  u <- runif(n, 0, 1)
+  q <- c(u, 1 - u)
+  x <- sqrt(16 - 2*log(1 - q))
+  return(x)
+}
+```
+### (b)
+Below, we generate $n = 50000$ pairs of antithetic variates which we use in the importance sampling. We choose $n$ as such because we generate pairs and $2n = 100000$, which is what we used in C.2.
+```{r}
+n <- 100000
+c <- exp(8)
+
+x <- anti(n/2)
+w <- 1/(sqrt(2*pi)*c*x)
+h <- (x > 4)
+
+theta.a <- 1/n * sum(h*w)
+theta.a
+```
+Finally, we compute a 95% confidence interval:
+```{r}
+sigma.a <- sqrt(1/(n*(n-1)) * sum((h*w - theta.a)^2)) 
+lower <- theta.a - qt(0.975, n - 1)*sigma.a
+upper <- theta.a + qt(0.975, n - 1)*sigma.a
+
+c(lower, upper)
+1/sigma.a^2
+```
+We observe that the precision is lower than for regular importance sampling.
+
 
 
 \newpage
@@ -697,18 +826,4 @@ mu.theta2
 We see that when using the $\text{Beta}(1,5)$ prior, our estimate for the posterior mean $\hat \mu_{\theta,2} =$ `r mu.theta2` is lower than the estimated posterior mean using the uniform prior. The reason for this is that the densities in $\text{Beta}(1,5)$ is higher in the lower end of the interval $(0,1)$, such that samples with lower values of $\theta$ has higher weights and thus contributes more relative to samples with higher values of $\theta$. Intuitively, this in turn means that the estimate must be lower with this method.
 
 In this particular example we see that the uniform prior got an estimate closer to the numerical value than the $\text{Beta}(1,5)$ prior. This highlights the importance of choosing good priors to get reasonable posterior estimates.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
