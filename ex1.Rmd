@@ -10,6 +10,7 @@ fig_height: 4
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "center")
 library(tidyverse)
+library(pracma)
 set.seed(4300)
 ```
 
@@ -41,7 +42,7 @@ sim.exp <- function(rate, n){
 Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge using $\lambda = 0.5$ and $n = 1000$.
 ```{r, cache=TRUE}
 rate <- 0.5
-n <- 1000
+n <- 10000
 sim <- data.frame(x = sim.exp(rate, n))
 x = seq(from = 0, to = 15, by = 0.1)
 exact <- data.frame(x = x, y = rate*exp(-rate*x))
@@ -61,7 +62,7 @@ data.frame(n.samples = 1:n,
            mean = cumsum(sim$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = 1/rate, color = "red") +
-  ggtitle("mean")
+  ggtitle("Mean")
   
 # Calculate the cumulative variance
 data.frame(n.samples = 1:n,
@@ -70,7 +71,7 @@ data.frame(n.samples = 1:n,
   mutate(var = mean2-mean^2) %>%
   ggplot() + geom_line(aes(n.samples, var)) +
   geom_hline(yintercept = 1/rate^2, color = "red") +
-  ggtitle("variance")
+  ggtitle("Variance")
 ```
 We observe that the the sampled mean and variance approach the theoretical values as the number of samples grows larger. 
 
@@ -118,8 +119,14 @@ G^{-1}(u) =
 $$
 
 ### b)
-Function for generating samples from $g$:
+Firstly, we implement $g$ and an algorithm to generate samples from $g$:
 ```{r}
+g <- function(alpha, x){
+  # Normalizing constant
+  c <- (1/alpha + exp(-1))^-1
+  c*x^(alpha-1) * (0<x)*(x<1) + c*exp(-x) *(x>=1)
+} 
+
 sim.g <- function(alpha, n){
   # Normalizing constant
   c <- (1/alpha + exp(-1))^-1
@@ -153,19 +160,21 @@ G.inv <- function(alpha, u){
 }
 ```
 
-To test our implementation we use $\alpha = 0.5$ and simulate for $n=1000$.
+To test our implementation we use $\alpha = 0.5$ and simulate $n=10000$ samples.
 
 ```{r}
 alpha <- 0.5
-n <- 1000
+n <- 10000
 sim <- data.frame(x = sim.g(alpha, n))
-x = seq(from = 0.02, to = 5, by = 0.05)
+x = seq(from = 0.002, to = 5, by = 0.05)
 exact <- data.frame(x = x, y = g(alpha, x))
 
 ggplot(sim) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.02) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) + coord_cartesian(xlim=c(0, 5))
 ```
 From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density. Next we find the theoretical mean and variance and compare with the estimated values. The theoretical mean is given by
 $$
@@ -179,7 +188,7 @@ $$
 & = \frac{c}{\alpha+2} + \frac{5c}{e} - \left(\frac{c}{\alpha+1} + \frac{2c}{e}\right)^2.
 \end{split}
 $$
-Comparing the true mean and variance with estimated values:
+Comparing the true mean and variance with estimated values: \textcolor{red}{ikke plott her?}
 ```{r}
 alpha <- 0.5
 c <- (1/alpha + exp(-1))^-1
@@ -233,7 +242,7 @@ $$
 
 ### c)
 
-Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given below.
+Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given as follows.
 
 ```{r}
 sim.sigm <- function(alpha, n){
@@ -242,17 +251,19 @@ sim.sigm <- function(alpha, n){
 }
 ```
 
-```{r}
+```{r, cache = TRUE}
 alpha <- 2
-n <- 1000
+n <- 10000
 sim <- data.frame(x = sim.sigm(alpha, n))
 x = seq(from = -10, to = 10, by = 0.1)
 exact <- data.frame(x = x, y = alpha*exp(alpha*x)/(1 + exp(alpha*x))^2)
 
 ggplot(sim) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
 
 To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}
@@ -283,46 +294,48 @@ box.mul <- function(n){
 }
 ```
 As usual, we compare the results of a simulation against the theoretical distribution.
-```{r}
-n <- 1000
+```{r, cache=TRUE}
+n <- 10000
 sim.box.mul <- data.frame(x = box.mul(n))
 x = seq(from = -5, to = 5, by = 0.1)
 exact <- data.frame(x = x, y = 1/sqrt(2*pi)*exp(-1/2*x^2))
 
 ggplot(sim.box.mul) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")  
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
 Finally, we compare the mean and variance resulting from the simulation with the theoretical values. 
 ```{r}
-# mean
+# Mean
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.box.mul$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = 0, color = "red") +
-  ggtitle("mean")
+  ggtitle("Mean")
   
-# variance
+# Variance
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.box.mul$x)/(1:n),
            mean2 = cumsum(sim.box.mul$x^2)/(1:n)) %>%
   mutate(var = mean2-mean^2) %>%
   ggplot() + geom_line(aes(n.samples, var)) +
   geom_hline(yintercept = 1, color = "red") +
-  ggtitle("variance")
+  ggtitle("Variance")
 ```
 
 
 ## A.5
 
-Let $N_d(\mu, \Sigma)$ be a $d$-variate normal distribution with mean $\mu$ and covariance $\Sigma$. This is our target distribution. To simulate from it, let $x \sim N_d(0,I_d)$ be a standard $d$-variate normal distribution. Then it follows that
+Let $\mathcal{N}_d(\mu, \Sigma)$ be a $d$-variate normal distribution with mean vector $\mu$ and covariance matrix $\Sigma$. This is our target distribution. To simulate from it, let $x \sim \mathcal{N}_d(0,I_d)$ be a standard $d$-variate normal distribution. Then, it follows that
 $$
-y = \mu + A x \quad \implies \quad y \sim N(\mu, AA^T),
+y = \mu + A x \quad \implies \quad y \sim \mathcal{N}(\mu, AA^T),
 $$
-where $A$ is a $d \times d$ matrix. Since the covariance matrix $\Sigma$ is both symmetric and positive-definite, we can write $\Sigma = A A^T$ using the Cholesky decomposition. Thus, for a given $\mu$ and $\Sigma$, we are able to simulate from this distribution after simulating from $N_d(0,I_d)$.
+where $A$ is a $d \times d$ matrix. Since the covariance matrix $\Sigma$ is both symmetric and positive-definite, we can write $\Sigma = A A^T$ using the Cholesky decomposition. Thus, for a given $\mu$ and $\Sigma$, we are able to simulate from this distribution after simulating from $\mathcal{N}_d(0,I_d)$.
 
-Reusing our implementation of the Box-Muller algorithm from A.4, a function for generating realizations from the target is shown below:
+Reusing our implementation of the Box-Muller algorithm from A.4, a function for generating samples from the multivariate normal distribution is shown below:
 ```{r}
 sim.mvnorm <- function(mu, Sigma, n){
   # Returns n realizations from a d-variate normal distribution
@@ -360,7 +373,7 @@ mu.est
 Sigma.est <- cov(t(y))
 Sigma.est
 ```
-From the printout in R, we see that the estimated values are close to the true values $\mu = \begin{pmatrix}1 \\ 2\end{pmatrix}$ and $\Sigma = \begin{pmatrix}1 & -0.7 \\ -0.7 & 2\end{pmatrix}$. This means that our function works properly.
+From the printout in R, we see that the estimated values are close to the true values $\mu = \begin{pmatrix}1 \\ 2\end{pmatrix}$ and $\Sigma = \begin{pmatrix}1 & -0.7 \\ -0.7 & 2\end{pmatrix}$. We conclude that our function works properly.
 
 
 \newpage
@@ -437,7 +450,7 @@ rou.gamma <- function(n, alpha){
 ```
 
 First, we check that the simulation algorithm gives reasonable results:
-```{r}
+```{r, cache=TRUE}
 n <- 10000
 alpha <-  2
 
@@ -446,15 +459,15 @@ x = seq(from = 0.1, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
 ggplot(data.frame(x = sim.gamma$sim)) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.1) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
-sim.gamma$tries
+geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.1) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 
 ```
 
 ```{r}
-library(pracma)
 n <- 1000
 alpha.vec <- seq(1.01, 2000, length.out = 10)
 tries.vec <- rep(0, 10)
@@ -477,7 +490,7 @@ f(x) = \frac{\beta^\alpha}{\Gamma(\alpha)}x^{\alpha -1}e^{-\beta x}.
 $$
 We use Marsaglia and Tsang’s method to generate from the gamma distribution:
 ```{r}
-sim.gamma <- function(n, alpha, beta){
+marsa.tsang <- function(n, alpha, beta){
   d <- alpha - 1/3
   c <- 1/sqrt(9*d)
   count <- 0
@@ -486,7 +499,7 @@ sim.gamma <- function(n, alpha, beta){
     z <- box.mul(1)
     u <- runif(1, 0, 1)
     v <- (1 + c*z)^3
-    if(z > -1/c && log(u) < 0.5*z^2 + d - d*V + d*log(V)){
+    if(z > -1/c && log(u) < 0.5*z^2 + d - d*v + d*log(v)){
       result[count + 1] = d*v
       count <- count + 1
     }
@@ -495,7 +508,25 @@ sim.gamma <- function(n, alpha, beta){
 }
 ```
 
-Check that it works god:...
+Next, we check if our simulation algorithm gives sensible results.
+```{r, cache=TRUE}
+n <- 10000
+alpha <-  2
+beta <- 2
+
+sim.gamma <- marsa.tsang(n, alpha, beta)
+x = seq(from = 0.1, to = 12, by = 0.1)
+exact <- data.frame(x = x, y = beta^alpha/gamma(alpha) * x^(alpha - 1) * exp(-beta*x))
+
+ggplot(data.frame(x = sim.gamma)) + 
+geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.05) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
+```
+
+
 
 ## B.4
 We repeat that $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$, and note that their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$, since they are independent. Next, we define $Z = \frac{X}{X + Y}$ and also introduce $V = X + Y$. Then, $X = ZV$ and $Y=V(1-Z)$, and, by the transformation formula, the joint density of $Z$ and $V$ is
@@ -580,14 +611,16 @@ inv.samp <- function(n){
   return(x)
 }
 
-sim <- inv.samp(2000)
+sim <- inv.samp(10000)
 x = seq(from = 4, to = 9, by = 0.1)
 exact <- data.frame(x = x, y = exp(8)*x*exp(-x^2/2))
 
 ggplot(data.frame(x = sim)) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.03) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c")
+ geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.01) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
 We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??}. Then, in the importance sampling scheme, the estimator is given as
 $$
@@ -767,7 +800,7 @@ f <- function(theta, y=c(125, 18, 20, 34)){
 }
 
 # Calculating the theoretical density and normalizing
-theta = seq(from = 0, to = 1, by = 0.01)
+theta = seq(from = 0, to = 1, by = 0.005)
 norm.const <- integrate(f,0,1)$value
 y <- f(theta) / norm.const
 
@@ -776,10 +809,13 @@ exact <- data.frame(x = theta, y = y)
 
 # Histogram + theoretical density + vertical line at estimated mean
 ggplot(sim.rej) + 
-  geom_histogram(aes(x = x, y = ..density..),
-                 alpha = 0.8, fill = "#69b3a2", binwidth = 0.01) + 
-  geom_line(data = exact , aes(x = x, y = y), color = "#e0474c") + 
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.01) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) + 
   geom_vline(xintercept=mu.theta, color="#000000")
+
 ```
 
 Below is an estimate of the mean using numerical integration:
