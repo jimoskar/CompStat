@@ -402,6 +402,9 @@ $$
 x^{\alpha-1}, \quad &x \ge 1. 
 \end{cases}
 $$
+
+### (b)
+
 The corresponding rejection sampling algorithm is implemented below.
 ```{r}
 rej.samp <- function(n, alpha){
@@ -432,7 +435,7 @@ n <- 10000
 alpha <- 0.5
 
 sim.gamma.rej <- data.frame(x = rej.samp(n, alpha))
-x = seq(from = 0, to = 5, by = 0.1)
+x = seq(from = 0, to = 8, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha-1)*exp(-x))
 
 ggplot(sim.gamma.rej) + 
@@ -442,6 +445,24 @@ ggplot(sim.gamma.rej) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
+```{r}
+# Mean
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim.gamma.rej$x)/(1:n)) %>%
+  ggplot() + geom_line(aes(n.samples, mean)) +
+  geom_hline(yintercept = alpha, color = "red") +
+  ggtitle("Mean")
+  
+# Variance
+data.frame(n.samples = 1:n,
+           mean = cumsum(sim.gamma.rej$x)/(1:n),
+           mean2 = cumsum(sim.gamma.rej$x^2)/(1:n)) %>%
+  mutate(var = mean2-mean^2) %>%
+  ggplot() + geom_line(aes(n.samples, var)) +
+  geom_hline(yintercept = alpha, color = "red") +
+  ggtitle("Variance")
+```
+We conclude that the sampling function works as intended.
 
 
 ## B.2
