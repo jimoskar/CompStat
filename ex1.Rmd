@@ -1,5 +1,5 @@
 ---
-title: "TMA4300: Exercise 1"
+title: "TMA4300 Computer Intensive Statistical Methods: Exercise 1"
 author: "Jim Totland, Martin Tufte"
 date: "1/29/2022"
 output: pdf_document
@@ -174,7 +174,8 @@ ggplot(sim) +
                  alpha = 0.8, binwidth = 0.02) + 
   geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
-  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) + coord_cartesian(xlim=c(0, 5))
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) + 
+  coord_cartesian(xlim=c(0, 5))
 ```
 From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density. Next we find the theoretical mean and variance and compare with the estimated values. The theoretical mean is given by
 $$
@@ -222,7 +223,7 @@ $$
 To progress from here, we introduce the substitution, $v = e^{\alpha x}$, which gives
 
 $$
-1 = \frac{c}{\alpha} \int_0^{\infty} \frac{dv}{(1 + v)^2} = \frac{c}{\alpha}(-\frac{1}{1 + v})\Big|_0^\infty =\frac{c}{\alpha}.
+1 = \frac{c}{\alpha} \int_0^{\infty} \frac{dv}{(1 + v)^2} = \frac{c}{\alpha}\left(-\frac{1}{1 + v}\right)\Big|_0^\infty =\frac{c}{\alpha}.
 $$
 Consequently, $c = \alpha$.
 
@@ -250,7 +251,7 @@ sim.sigm <- function(alpha, n){
   1/alpha * log(u/(1-u))
 }
 ```
-
+We compare the simulated values with the theoretical distribution:
 ```{r, cache = TRUE}
 alpha <- 2
 n <- 10000
@@ -380,6 +381,68 @@ From the printout in R, we see that the estimated values are close to the true v
 # Problem B
 ## B.1
 ### (a)
+We consider the gamma distribution with $\alpha \in (0,1)$ and $\beta = 0$, i.e.
+$$
+f(x) = \begin{cases} \frac{1}{\Gamma(\alpha)}x^{\alpha -1}e^{-x}, \quad &0 < x, \\
+0, \quad &\text{otherwise}.
+\end{cases}
+$$
+Let $g$ denote the distribution considered in A.2. Then, for $x\in(0,1)$, 
+$$
+\frac{g(x)}{f(x)} = \frac{\Gamma(\alpha)x^{\alpha-1}}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}} = \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}e^x \ge \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)} =: k.
+$$
+For $x \ge 1$, we have
+$$
+\frac{g(x)}{f(x)} = \frac{\Gamma(\alpha)e^{-x}}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}} = \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}x^{1-\alpha} \ge \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)} = k.
+$$
+Consequently, we know that $f(x) \le \frac{1}{k} g(x) \;\forall x$, and the acceptance probablity is given by
+
+$$
+\xi(x) = k\frac{f(x)}{g(x)} = \begin{cases} e^{-x}, \quad &0<x<1,\\
+x^{\alpha-1}, \quad &x \ge 1. 
+\end{cases}
+$$
+The corresponding rejection sampling algorithm is implemented below.
+```{r}
+rej.samp <- function(n, alpha){
+  count <- 0
+  result <- rep(NA, n)
+  while(count < n){
+    x <- sim.g(alpha, 1)
+    u <- runif(1,0,1)
+    a <- NA # acceptance probability
+    
+    if(x < 1){
+      a = exp(-x)
+    } else{
+      a = x^(alpha-1)
+    }
+    
+    if(u <= a){
+      result[count + 1] = x
+      count = count + 1
+     }
+  }
+  return(result)
+}
+```
+We conduct our usual sanity check.
+```{r, cache=TRUE}
+n <- 10000
+alpha <- 0.5
+
+sim.gamma.rej <- data.frame(x = rej.samp(n, alpha))
+x = seq(from = 0, to = 5, by = 0.1)
+exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha-1)*exp(-x))
+
+ggplot(sim.gamma.rej) + 
+  geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.05) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
+```
+
 
 ## B.2
 ### (a)
