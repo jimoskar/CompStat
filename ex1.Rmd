@@ -11,6 +11,7 @@ fig_height: 4
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 4, fig.align = "center")
 library(tidyverse)
 library(pracma)
+library(mvtnorm)
 set.seed(4300)
 ```
 
@@ -216,6 +217,10 @@ We see that our simulation gives approximate correct values for the theoretical 
 
 ## A.3
 ### a)
+We consider the probability density function
+$$
+f(x) = \frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}, \quad x\in(-\infty, \infty), \;\alpha >0.
+$$
 To find the value of $c$, we integrate the density over the entire domain and equate the result to 1:
 $$
 1 = \int_{-\infty}^{\infty}f(x)dx = c\int_{-\infty}^{\infty}\frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}dx.
@@ -352,7 +357,7 @@ sim.mvnorm <- function(mu, Sigma, n){
 }
 ```
 
-To test our implementation, we generate a bivariate normal distribution:
+To test our implementation, we generate a bivariate normal distribution and plot some of the samples with the theoretical level curves:
 ```{r}
 # Bivariate example
 mu <- c(1,2)
@@ -361,8 +366,20 @@ Sigma <- matrix(c(1, -.7, -.7, 2), 2)
 # Simulate 10000 realizations
 y <- sim.mvnorm(mu, Sigma, 10000)
 
+# Create theoretical level curves
+x.points <- seq(-3,4,length.out=100)
+y.points <- seq(-2, 6, length.out=100)
+z <- matrix(0,nrow=100,ncol=100)
+for (i in 1:100) {
+   for (j in 1:100) {
+    z[i,j] <- dmvnorm(c(x.points[i],y.points[j]),
+    mean=mu,sigma=Sigma)
+   }
+}
+
 # Plot first 500 points
-plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", xlab="x", ylab="y", pch=16)
+plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", xlab="x", ylab="y", pch=16, cex = 0.4)
+contour(x.points,y.points,z, add = TRUE)
 ```
 Comparing the true mean and covariance with estimated values:
 ```{r}
@@ -462,7 +479,7 @@ data.frame(n.samples = 1:n,
   geom_hline(yintercept = alpha, color = "red") +
   ggtitle("Variance")
 ```
-We conclude that the sampling function works as intended.
+We conclude that the rejection sampling function works as intended.
 
 
 ## B.2
@@ -488,7 +505,7 @@ $$
 $$
 which clearly is a global maximum. Consequently,
 $$
-a = \sqrt{\alpha - 1}.
+a = \sqrt{f^*(\alpha -1 )} = (\alpha-1)^{(\alpha-1)/2}e^{-(\alpha-1)/2} = \left[ \frac{\alpha - 1}{e} \right]^{\frac{1-\alpha}{2}}.
 $$
 
 Analogously, to find  $b_+ = \sqrt{\sup_{x\ge 0} x^2f^*(x)} = \sqrt{\sup_{x\ge 0}g(x)}$, we note that $g(z = 0) = 0$ and only consider $\sup_{x > 0}g(x)$, which amounts to solving
@@ -502,30 +519,46 @@ $$
 $$
 which clearly is a global maximum for $x \ge 0$. Consequently,
 $$
-b_+ = \sqrt{\alpha + 1}.
+b_+ = \sqrt{(\alpha + 1)^2f^*(\alpha + 1)} = (\alpha + 1)^{(\alpha +1)/2}e^{-(\alpha+1)/2} = \left[ \frac{\alpha + 1}{e} \right]^{\frac{\alpha+1}{2}}.
 $$
 
 Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{0} = 0$.
 
 ### (b)
 
+The algorithm which uses the ratio of uniforms-method to sample from the gamma distribution with $\alpha >0$ and $\beta = 1$ is given below. Note that the algorithm is implemented on the log scale.
 ```{r}
+samp.log.unif <- function(n, a, b){
+  u <- runif(n)
+  x <- log((b-a)*u + a)
+  return(x)
+}
 rou.gamma <- function(n, alpha){
-  a <-  sqrt(alpha - 1)
+  #log.a <-  (1-alpha)/2 * (log(alpha - 1) -1)
+  #log.b.plus <- (alpha + 1)/2 * (log(alpha + 1) - 1)
+  a <- ((alpha - 1)/exp(1))^((1 - alpha)/2)
+  b.plus <- ((alpha + 1)/exp(1))^((alpha + 1)/2)
   b.minus <- 0
-  b.plus <- sqrt(alpha + 1)
   
-  count <-  0
+  print(alpha)
+  print(a)
+  print(b.plus)
+  
+  count <- 0
   tries <- 0
   result <- rep(0,n)
   
   while(count < n){
-    x1 <- a*runif(1, 0, 1)
-    x2 <- b.minus + b.plus*runif(1, 0, 1) 
+    log.x1 <- samp.log.unif(1, 0, a)
+    log.x2 <- samp.log.unif(1, b.minus, b.plus)
+    print(log.x1 )
+    print(0.5*((alpha - 1)*(log.x2 - log.x1) - exp(log.x2 - log.x1)))
+    
   
-    if(log(x1) <= 0.5*((alpha - 1)*log(x2/x1) - x2/x1)){
-      result[count + 1] = x2/x1
-      count <- count + 1
+    if(log.x1 <= 0.5*((alpha - 1)*(log.x2 - log.x1) - exp(log.x2 - log.x1))){
+      result[count + 1] = exp(log.x2 - log.x1)
+      count = count + 1
+      print(count)
     }
     tries = tries + 1
   }
@@ -534,35 +567,35 @@ rou.gamma <- function(n, alpha){
 ```
 
 First, we check that the simulation algorithm gives reasonable results:
-```{r, cache=TRUE}
-n <- 10000
-alpha <-  2
+```{r, cache=TRUE, eval=FALSE}
+n <- 100
+alpha <-  100
 
 sim.gamma <- rou.gamma(n, alpha)
-x = seq(from = 0.1, to = 12, by = 0.1)
+x = seq(from = 0.01, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
 ggplot(data.frame(x = sim.gamma$sim)) + 
 geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
-                 alpha = 0.8, binwidth = 0.1) + 
+                 alpha = 0.8, binwidth = 0.07) + 
   geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 
 ```
 
-```{r}
-n <- 1000
-alpha.vec <- seq(1.01, 2000, length.out = 10)
-tries.vec <- rep(0, 10)
-for(i in 1:length(alpha.vec)){
+```{r, eval = FALSE}
+n <- 1000 # number of desired samples
+m <- 10 # length of alpha.vec
+alpha.vec <- seq(from = 1.01, to = 10, length.out = m)
+tries.vec <- rep(0, m)
+for(i in 1:m){
   alpha <- alpha.vec[i]
   sim.gamma <- rou.gamma(n, alpha)
   tries.vec[i] = sim.gamma$tries
 }
 
 plot(alpha.vec, tries.vec, pch = 16)
-abline(h = 3, col="blue")
 ```
 The number of necessary tries is highest for low values of $\alpha$, i.e. $\ln\alpha < 2$, while it stabilizes after that. This indicates that $C_f$ constitutes a smaller proportion of $[0, a] \times [b_{-},b_{+}]$. \textcolor{red}{mer tolkning?? Tror det er feil. Tror antall tries skal øke med alpha.}
 
