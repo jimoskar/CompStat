@@ -423,7 +423,7 @@ $$
 
 The corresponding rejection sampling algorithm is implemented below.
 ```{r}
-rej.samp <- function(n, alpha){
+gamma.rej.samp <- function(n, alpha){
   count <- 0
   result <- rep(NA, n)
   p <- gamma(alpha)/(1/alpha + 1/exp(1)) # Acceptance probability
@@ -445,7 +445,7 @@ We conduct our usual sanity check.
 n <- 10000
 alpha <- 0.5
 
-sim.gamma.rej <- data.frame(x = rej.samp(n, alpha))
+sim.gamma.rej <- data.frame(x = gamma.rej.samp(n, alpha))
 x = seq(from = 0, to = 8, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha-1)*exp(-x))
 
@@ -527,7 +527,7 @@ samp.log.unif <- function(n, a, b){
   x <- log((b-a)*u + a)
   return(x)
 }
-rou.gamma <- function(n, alpha){
+gamma.rou <- function(n, alpha){
   #log.a <-  (1-alpha)/2 * (log(alpha - 1) -1)
   #log.b.plus <- (alpha + 1)/2 * (log(alpha + 1) - 1)
   a <- ((alpha - 1)/exp(1))^((1 - alpha)/2)
@@ -565,7 +565,7 @@ First, we check that the simulation algorithm gives reasonable results:
 n <- 100
 alpha <-  100
 
-sim.gamma <- rou.gamma(n, alpha)
+sim.gamma <- gamma.rou(n, alpha)
 x = seq(from = 0.01, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
@@ -585,7 +585,7 @@ alpha.vec <- seq(from = 1.01, to = 10, length.out = m)
 tries.vec <- rep(0, m)
 for(i in 1:m){
   alpha <- alpha.vec[i]
-  sim.gamma <- rou.gamma(n, alpha)
+  sim.gamma <- gamma.rou(n, alpha)
   tries.vec[i] = sim.gamma$tries
 }
 
@@ -619,13 +619,27 @@ marsa.tsang <- function(n, alpha, beta){
 }
 ```
 
+```{r}
+sample.gamma <- function(n, alpha, beta){
+  if(alpha == 1){
+    return(sim.exp(beta, n))
+  } else if( alpha < 1){
+    return(gamma.rej.samp(n, alpha)/beta)
+  } else if( alpha > 1) {
+    return(gamma.rou(n, alpha)/beta)
+  } else{
+    stop("Invalid value of alpha")
+  }
+}
+```
+
 Next, we check if our simulation algorithm gives sensible results.
 ```{r, cache=TRUE}
 n <- 10000
-alpha <-  2
+alpha <-  1
 beta <- 2
 
-sim.gamma <- marsa.tsang(n, alpha, beta)
+sim.gamma <- sample.gamma(n, alpha, beta)
 x = seq(from = 0.1, to = 12, by = 0.1)
 exact <- data.frame(x = x, y = beta^alpha/gamma(alpha) * x^(alpha - 1) * exp(-beta*x))
 
