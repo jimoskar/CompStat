@@ -80,6 +80,7 @@ We observe that the the sampled mean and variance approach the theoretical value
 ## A.2
 
 We consider the probability distribution given by
+
 $$
 g(x) = 
 \begin{cases}
@@ -398,26 +399,24 @@ From the printout in R, we see that the estimated values are close to the true v
 # Problem B
 ## B.1
 ### (a)
-We consider the gamma distribution with $\alpha \in (0,1)$ and $\beta = 0$, i.e.
+We consider the gamma distribution with $\alpha \in (0,1)$ and $\beta = 1$, i.e.
 $$
 f(x) = \begin{cases} \frac{1}{\Gamma(\alpha)}x^{\alpha -1}e^{-x}, \quad &0 < x, \\
 0, \quad &\text{otherwise}.
 \end{cases}
 $$
-Let $g$ denote the distribution considered in A.2. Then, for $x\in(0,1)$, 
+Let $g$ denote the proposal distribution an be given by $g(x)$ considered in A.2. Then, we want to find $k > 1$ such that $f(x) \le k g(x) \;\forall x\in\mathbb{R}$. The inequality is trivially satisfied for any $k$ when $x \le 0$. For $x\in(0,1)$, 
 $$
-\frac{g(x)}{f(x)} = \frac{\Gamma(\alpha)x^{\alpha-1}}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}} = \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}e^x \ge \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)} =: k.
+\frac{f(x)}{g(x)} = \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}}{\Gamma(\alpha)x^{\alpha-1}} = \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}{\Gamma(\alpha)}e^{-x} \le \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}{\Gamma(\alpha)}.
 $$
 For $x \ge 1$, we have
 $$
-\frac{g(x)}{f(x)} = \frac{\Gamma(\alpha)e^{-x}}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}} = \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}x^{1-\alpha} \ge \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)} = k.
+\frac{f(x)}{g(x)} = \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}e^{-x}}{\Gamma(\alpha)e^{-x}} = \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)x^{\alpha-1}}{\Gamma(\alpha)} \le \frac{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}{\Gamma(\alpha)}.
 $$
-Consequently, we know that $f(x) \le \frac{1}{k} g(x) \;\forall x$, and the acceptance probablity is given by
+Consequently, to maximize the acceptance probability given by $p = \frac{1}{k}$, we choose $k:= \left(\frac{1}{\alpha} + \frac{1}{e}\right)/\Gamma(\alpha)$. That is, the acceptance probability becomes
 
 $$
-\xi(x) = k\frac{f(x)}{g(x)} = \begin{cases} e^{-x}, \quad &0<x<1,\\
-x^{\alpha-1}, \quad &x \ge 1. 
-\end{cases}
+p = \frac{\Gamma(\alpha)}{\left(\frac{1}{\alpha} + \frac{1}{e}\right)}.
 $$
 
 ### (b)
@@ -427,18 +426,13 @@ The corresponding rejection sampling algorithm is implemented below.
 rej.samp <- function(n, alpha){
   count <- 0
   result <- rep(NA, n)
+  p <- gamma(alpha)/(1/alpha + 1/exp(1)) # Acceptance probability
   while(count < n){
     x <- sim.g(alpha, 1)
+    g.val <- g(alpha, x)
+    f.val <- 1/gamma(alpha) * x^(alpha-1)*exp(-x)
     u <- runif(1,0,1)
-    a <- NA # acceptance probability
-    
-    if(x < 1){
-      a = exp(-x)
-    } else{
-      a = x^(alpha-1)
-    }
-    
-    if(u <= a){
+    if(u <= p*f.val/g.val){
       result[count + 1] = x
       count = count + 1
      }
