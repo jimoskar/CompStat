@@ -789,6 +789,11 @@ We define the precision of the estimators as the reciprocal of the variance of t
 
 ## C.3
 ### (a)
+We define the antithetic estimator as
+$$
+\hat\theta_{AS} = \frac{1}{2}\left(\hat\theta_{IS}^{(1)} + \hat\theta_{IS}^{(2)}\right),
+$$
+where $\hat\theta_{IS}^{(1)}$ and $\hat\theta_{IS}^{(2)}$ are simulated by the same importance sampling procedure as in C.2, but are respectively based on $u$ and $u -1$ in the inversion sampling.  \textcolor{red}{continue fixing here!}
 The algorithm which samples $n$ antithetic from $g$ is given below.
 ```{r}
 anti <- function(n){
