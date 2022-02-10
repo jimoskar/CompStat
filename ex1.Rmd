@@ -489,7 +489,6 @@ $$
 \sup_{x > 0} f^*(x),
 $$
 which amounts to solving
-
 $$
 \begin{split}
 \frac{d}{dx} f^*(x)= 0 \\
@@ -522,37 +521,35 @@ Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{0} = 0$.
 
 The algorithm which uses the ratio of uniforms-method to sample from the gamma distribution with $\alpha >0$ and $\beta = 1$ is given below. Note that the algorithm is implemented on the log scale.
 ```{r}
-samp.log.unif <- function(n, a, b){
+samp.log.unif <- function(n, log.b){
   u <- runif(n)
-  x <- log((b-a)*u + a)
+  x <- log.b + log(u) # log((b-a)*u + a) = log(b) + log(u) when a = 0.
   return(x)
 }
+
+log.core.gamma <- function(x, alpha){
+  if(x <= 0){return(-Inf)}
+  else{return((alpha - 1)*log(x) - x)}
+}
+
 gamma.rou <- function(n, alpha){
-  #log.a <-  (1-alpha)/2 * (log(alpha - 1) -1)
-  #log.b.plus <- (alpha + 1)/2 * (log(alpha + 1) - 1)
-  a <- ((alpha - 1)/exp(1))^((1 - alpha)/2)
+  log.a <-  (alpha - 1)/2 * (log(alpha - 1) - 1)
+  log.b.plus <- (alpha + 1)/2 * (log(alpha + 1) - 1)
+  a <- ((alpha - 1)/exp(1))^((alpha - 1)/2)
   b.plus <- ((alpha + 1)/exp(1))^((alpha + 1)/2)
   b.minus <- 0
-  
-  print(alpha)
-  print(a)
-  print(b.plus)
   
   count <- 0
   tries <- 0
   result <- rep(0,n)
   
   while(count < n){
-    log.x1 <- samp.log.unif(1, 0, a)
-    log.x2 <- samp.log.unif(1, b.minus, b.plus)
-    print(log.x1 )
-    print(0.5*((alpha - 1)*(log.x2 - log.x1) - exp(log.x2 - log.x1)))
-    
+    log.x1 <- samp.log.unif(1, log.a)
+    log.x2 <- samp.log.unif(1, log.b.plus)
   
-    if(log.x1 <= 0.5*((alpha - 1)*(log.x2 - log.x1) - exp(log.x2 - log.x1))){
+    if(log.x1 <= 0.5*log.core.gamma(exp(log.x2 - log.x1), alpha)){
       result[count + 1] = exp(log.x2 - log.x1)
       count = count + 1
-      print(count)
     }
     tries = tries + 1
   }
@@ -561,27 +558,27 @@ gamma.rou <- function(n, alpha){
 ```
 
 First, we check that the simulation algorithm gives reasonable results:
-```{r, cache=TRUE, eval=FALSE}
-n <- 100
-alpha <-  100
+```{r, cache=TRUE}
+n <- 100000
+alpha <- 10
 
 sim.gamma <- gamma.rou(n, alpha)
-x = seq(from = 0.01, to = 12, by = 0.1)
+x = seq(from = 0.01, to = 25, by = 0.1)
 exact <- data.frame(x = x, y = 1/gamma(alpha) * x^(alpha - 1) * exp(-x))
 
 ggplot(data.frame(x = sim.gamma$sim)) + 
 geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
-                 alpha = 0.8, binwidth = 0.07) + 
+                 alpha = 0.8, binwidth = 0.1) + 
   geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 
 ```
 
-```{r, eval = FALSE}
+```{r, cache = TRUE}
 n <- 1000 # number of desired samples
-m <- 10 # length of alpha.vec
-alpha.vec <- seq(from = 1.01, to = 10, length.out = m)
+m <- 100 # length of alpha.vec
+alpha.vec <- seq(from = 1.01, to = 2000, length.out = m)
 tries.vec <- rep(0, m)
 for(i in 1:m){
   alpha <- alpha.vec[i]
@@ -591,7 +588,7 @@ for(i in 1:m){
 
 plot(alpha.vec, tries.vec, pch = 16)
 ```
-The number of necessary tries is highest for low values of $\alpha$, i.e. $\ln\alpha < 2$, while it stabilizes after that. This indicates that $C_f$ constitutes a smaller proportion of $[0, a] \times [b_{-},b_{+}]$. \textcolor{red}{mer tolkning?? Tror det er feil. Tror antall tries skal øke med alpha.}
+The number of necessary tries increases with $\alpha$. This indicates that the proportion of $[0, a] \times [b_{-},b_{+}]$ which $C_f$ occupies is inversely proportional to $\alpha$.
 
 ## B.3
 We recall that the gamma distribution has probability density function (PDF)
@@ -677,11 +674,17 @@ which is what we wanted show.
 \newpage
 # Problem C
 ## C.1
-We observe that $\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x) = \mathrm{E}_f[\mathbb{I}(X >4)]$. Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+We observe that 
+$$
+\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x) = \mathrm{E}_f[\mathbb{I}(X >4)].
+$$
+
+Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
 
 $$
 \hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X_i > 4).
 $$
+
 Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$. The estimate is computed below.
 ```{r}
 n <- 100000
