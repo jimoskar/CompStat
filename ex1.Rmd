@@ -91,7 +91,7 @@ ce^{-x}, & 1 \le x\\
 $$
 where $c$ is a normalizing constant and $\alpha \in (0,\ 1)$.
 
-### a)
+### (a)
 Normalizing the density using $\int_{-\infty}^{\infty} g(x)\ \text{d}x = c \int_0^1 x^{\alpha-1}\ \text{d}x + c\int_1^{\infty} e^{-x}\ \text{d}x = c(\frac1\alpha + \frac1e) = 1$, it follows that the normalizing constant is $c = (\frac1\alpha + \frac1e)^{-1}$.
 The cumulative distribution function is given by
 $$
@@ -120,7 +120,7 @@ G^{-1}(u) =
 \end{cases}.
 $$
 
-### b)
+### (b)
 Firstly, we implement $g$ and an algorithm to generate samples from $g$:
 ```{r}
 g <- function(alpha, x){
@@ -203,7 +203,7 @@ sim <- sim.g(alpha, 10000)
 mean.g <- c/(alpha+1) + 2*c/exp(1)
 var.g <- c/(alpha+2) + 5*c/exp(1) - mean.g^2
 
-# Estimated mean
+# Estimated mean and variance
 mean.est <- mean(sim)
 var.est <- var(sim)
 
@@ -214,40 +214,40 @@ c(mean.g, mean.est)
 c(var.g, var.est)
 ```
 We see that our simulation gives approximate correct values for the theoretical mean and variance.
-
+\textcolor{blue}{Legge til kumulativ mean og varians og se at de konvergerer for økende n. Akkurat som i oppgavene før.}
 
 ## A.3
-### a)
+### (a)
 We consider the probability density function
 $$
-f(x) = \frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}, \quad x\in(-\infty, \infty), \;\alpha >0.
+f(x) = \frac{c e^{\alpha x}}{(1 + e^{\alpha x})^2}, \quad x\in(-\infty, \infty), \;\alpha >0.
 $$
 To find the value of $c$, we integrate the density over the entire domain and equate the result to 1:
 $$
-1 = \int_{-\infty}^{\infty}f(x)dx = c\int_{-\infty}^{\infty}\frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}dx.
+1 = \int_{-\infty}^{\infty}f(x)\ dx = c\int_{-\infty}^{\infty}\frac{e^{\alpha x}}{(1 + e^{\alpha x})^2}dx.
 $$
 To progress from here, we introduce the substitution, $v = e^{\alpha x}$, which gives
 
 $$
-1 = \frac{c}{\alpha} \int_0^{\infty} \frac{dv}{(1 + v)^2} = \frac{c}{\alpha}\left(-\frac{1}{1 + v}\right)\Big|_0^\infty =\frac{c}{\alpha}.
+1 = \frac{c}{\alpha} \int_0^{\infty} \frac{dv}{(1 + v)^2} = \frac{c}{\alpha}\left(-\frac{1}{1 + v}\right)\Bigg|_0^\infty =\frac{c}{\alpha}.
 $$
 Consequently, $c = \alpha$.
 
-### b)
-The CDF is defined as follows,
+### (b)
+The cumulative distribution function is
 $$
 \begin{split}
-F(x) &= \int_{-\infty}^xf(z)dz =  \int_0^{\exp(\alpha x)} \frac{dv}{(1 + v)^2} \\
- &= 1-\frac{1}{1 + \exp(\alpha x)} = \frac{\exp(\alpha x)}{1 + \exp(\alpha x)},
+F(x) &= \int_{-\infty}^xf(z)\ dz =  \int_0^{e^{\alpha x}} \frac{dv}{(1 + v)^2} \\
+ &= 1-\frac{1}{1 + e^{\alpha x}} = \frac{e^{\alpha x}}{1 + e^{\alpha x}},
 \end{split}
 $$
 
-where we have used the same substitution as earlier, namely $v = e^{\alpha z}$. We notice that $F(x)$ is the Sigmoid function, which has the well known logit-function as its inverse. I.e.,
+where we have used the same substitution as earlier, namely $v = e^{\alpha z}$. We notice that $F(x)$ is the Sigmoid function, which has the logit-function as its inverse. That is,
 $$
-F^{-1}(x) = \frac{1}{\alpha}\ln\left(\frac{x}{1-x}\right).
+F^{-1}(u) = \frac{1}{\alpha}\ln\left(\frac{u}{1-u}\right).
 $$
 
-### c)
+### (c)
 
 Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given as follows.
 
@@ -273,30 +273,31 @@ ggplot(sim) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
 
-To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}
+To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}\textcolor{blue}{Den er vel åpenbart null?}
+
+\textcolor{blue}{Jeg tror vi skal legge til en sammenligning til teoretisk mean (=0?) og varians.}
 
 ## A.4
-Below is our implementation of the Box-Muller algorithm.
+To generate samples from the standard normal distribution, we make use of the Box-Muller algorithm. Our implementation of the algorithm is given below:
 ```{r}
 box.mul <- function(n){
-  odd <-  FALSE
-  if(n %% 2 != 0){
-    odd <-  TRUE
-    n <- n + 1
-  }
+  # Number of sample pairs to generate 
+  m <- ceil(n/2)
   
-  x1 <- 2*pi * runif(n/2, 0, 1)
-  x2 <- sim.exp(0.5, n/2)
+  x1 <- 2*pi * runif(m, 0, 1)
+  x2 <- sim.exp(0.5, m)
   
   y1 <- sqrt(x2)*cos(x1)
   y2 <- sqrt(x2)*sin(x1)
   
-  concat <- c(y1,y2)
-  if(odd){
-    return(head(concat, -1))
+  # Concatenate y1 and y2
+  concat <- c(y1, y2)
+  
+  if(n %% 2){ # Drop last element if n is odd.
+    head(concat, -1)
   }
   else{
-    return(concat)
+    concat
   }
 }
 ```
@@ -379,8 +380,9 @@ for (i in 1:100) {
 }
 
 # Plot first 500 points
-plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", xlab="x", ylab="y", pch=16, cex = 0.4)
-contour(x.points,y.points,z, add = TRUE)
+plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", 
+     xlab="x", ylab="y", pch=16, cex = 0.4)
+contour(x.points, y.points, z, add = TRUE)
 ```
 Comparing the true mean and covariance with estimated values:
 ```{r}
@@ -437,7 +439,7 @@ gamma.rej.samp <- function(n, alpha){
       count = count + 1
      }
   }
-  return(result)
+  result
 }
 ```
 We conduct our usual sanity check.
@@ -553,7 +555,7 @@ gamma.rou <- function(n, alpha){
     }
     tries = tries + 1
   }
-  return(list("sim" = result, "tries" = tries))
+  list("sim" = result, "tries" = tries)
 }
 ```
 
@@ -576,8 +578,8 @@ geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
 ```
 
 ```{r, cache = TRUE}
-n <- 1000 # number of desired samples
-m <- 100 # length of alpha.vec
+n <- 1000 # Number of desired samples
+m <- 100 # Length of alpha vector
 alpha.vec <- seq(from = 1.01, to = 2000, length.out = m)
 tries.vec <- rep(0, m)
 for(i in 1:m){
@@ -586,12 +588,12 @@ for(i in 1:m){
   tries.vec[i] = sim.gamma$tries
 }
 
-plot(alpha.vec, tries.vec, pch = 16)
+plot(alpha.vec, tries.vec, pch = 16, cex=0.5)
 ```
 The number of necessary tries increases with $\alpha$. This indicates that the proportion of $[0, a] \times [b_{-},b_{+}]$ which $C_f$ occupies is inversely proportional to $\alpha$.
 
 ## B.3
-We recall that the gamma distribution has probability density function (PDF)
+Recall that the gamma distribution has probability density function given as
 
 $$
 f(x) = \frac{\beta^\alpha}{\Gamma(\alpha)}x^{\alpha -1}e^{-\beta x}.
@@ -651,57 +653,83 @@ geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
 
 
 ## B.4
-We repeat that $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$, and note that their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$, since they are independent. Next, we define $Z = \frac{X}{X + Y}$ and also introduce $V = X + Y$. Then, $X = ZV$ and $Y=V(1-Z)$, and, by the transformation formula, the joint density of $Z$ and $V$ is
+
+### (a)
+We repeat the problem description for completeness. Let $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$. Since $X$ and $Y$ are independent, their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$. Next, define $Z = \frac{X}{X + Y}$ and $V = X + Y$. Then, $X = ZV$ and $Y=V(1-Z)$, and, by the transformation formula, the joint density of $Z$ and $V$ is
 
 $$
 \begin{split}
 f_{Z, V}(z,v) &= f_{X, Y}(zv, v(1-z)) \cdot \begin{vmatrix} v & z \\
 -v & 1-z\end{vmatrix} \\
 &= (\Gamma(\alpha) \Gamma(\beta))^{-1}\cdot(zv)^{\alpha-1} e^{-zv} \cdot (v(1-z))^{\beta -1}e^{-v(1-z)}\cdot[v(1-z) + vz] \\
-&=(\Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1}\cdot v^{[\alpha + \beta] - 1} \cdot e^{-v}.
+&=(\Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1}\cdot v^{(\alpha + \beta) - 1} \cdot e^{-v}.
 \end{split}
 $$
-Thus, the marginal distribution of $Z$ is given as
-
+The marginal distribution of $Z$ is found from integrating over the whole domain for $V$. Thus it follows that
 $$
 \begin{split}
-\int_0^\infty f_{Z, V}(z,v)dv &= \Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1} \int_0^\infty v^{[\alpha + \beta] - 1} \cdot e^{-v} dv \\
-&= \frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha) \Gamma(\beta)} z^{\alpha-1}(1-z)^{\beta - 1},
+f_Z(z) = \int_0^\infty f_{Z, V}(z,v)\ dv &= \Gamma(\alpha) \Gamma(\beta))^{-1} \cdot z^{\alpha-1}(1-z)^{\beta - 1} \int_0^\infty v^{(\alpha + \beta) - 1} \cdot e^{-v} dv \\
+&= \frac{\Gamma(\alpha + \beta)}{\Gamma(\alpha) \Gamma(\beta)} z^{\alpha-1}(1-z)^{\beta - 1}.
 \end{split}
 $$
-which is what we wanted show.
+We recognize that this density is identical to $\text{Beta}(\alpha, \beta)$, so it follows that $Z \sim \text{Beta}(\alpha, \beta)$.
+
+### (b)
+To generate a vector of $n$ independent samples from a beta distribution with parameters $\alpha$ and $\beta$, i.e. to sample from $Z$, we will reuse our function from B.1 to sample from $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$, then calculate $Z = \frac{X}{X+Y}$. Our implementation for sampling $n$ independent samples from $\text{Beta}(\alpha, \beta)$ is below:
+```{r}
+sim.beta <- function(n, alpha, beta){
+  # Generate n samples from Gamma(alpha, 1) and Gamma(beta, 1)
+  x <- gamma.rej.samp(n, alpha)
+  y <- gamma.rej.samp(n, beta)
+  
+  # Return z=x/(x+y), n independent values from the Beta(alpha, beta)
+  x/(x+y)
+}
+```
+
+\textcolor{blue}{Vi må sjekke at simuleringsfunksjonen fungerer som den skal med et eksempel.}
+```{r}
+z <- sim.beta(10000, 5, 2)
+hist(z)
+```
 
 \newpage
 # Problem C
 ## C.1
 We observe that 
 $$
-\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x) = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x) = \mathrm{E}_f[\mathbb{I}(X >4)].
+\theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x)\ \text{d}x = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x)\ \text{d}x = \mathrm{E}_f[\mathbb{I}(X >4)].
 $$
 
-Then, by the method of Monte Carlo (MC) integration, an estimate of $\theta$ is
+Then, using Monte Carlo integration, an estimate of $\theta$ is
 
 $$
-\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(X_i > 4).
+\hat{\theta} = \frac{1}{n}\sum_{i = 1}^n\mathbb{I}(x_i > 4).
 $$
 
-Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$. The estimate is computed below.
+Here, $n$ is the number of samples, $\mathbb{I}$ is the indicator function and $X \sim \mathcal{N}(0, 1)$. The estimate is computed below with $n = 100000$.
 ```{r}
+# Simulate 100000 samples from the standard normal distribution
 n <- 100000
 x <- box.mul(n)
+# Boolean array, indicates which values of x has value >4
 h <- (x > 4)
+# Monte Carlo estimate
 theta.hat <- 1/n * sum(h)
 theta.hat
+# Theoretical value
 pnorm(4, lower.tail = FALSE)
 ```
 
-To compute a confidence interval, we need the variance of $\hat\theta$. We define $h(X) = \mathbb{I}(X  >4 )$
+To compute a confidence interval, we need the variance of $\hat\theta$. We define $h(X) = \mathbb{I}(X  >4 )$. Then
 $$
 \begin{split}
 \mathrm{Var}[\hat\theta] &= \frac{1}{n^2}\sum_{i = 1}^n\mathrm{Var}_f[h(X_i)] = \frac{1}{n}\mathrm{Var}_f[h(X)] \\
 &\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i) - \hat\theta)^2 \right) =: \hat{\sigma}^2.
 \end{split}
 $$
+\textcolor{blue}{Dobbeltsjekk at dette riktig utregning ved bruk av indikatorfunksjonen?}
+
 We also utilize the central limit theorem, such that $\hat\theta \sim \mathcal{N}\left(\theta, \mathrm{Var}[\hat\theta]\right)$. Then we know that
 
 $$
@@ -749,7 +777,7 @@ ggplot(data.frame(x = sim)) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
-We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??}. Then, in the importance sampling scheme, the estimator is given as
+We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??} \textcolor{blue}{Sara did say it is not necessary, but it is nice}. Then, in the importance sampling scheme, the estimator is given as
 $$
 \hat\theta_{IS} = \frac{1}{n} \sum_{i = 1}^n\frac{h(X_i)f(X_i)}{g(X_i)} = \frac{1}{n} \sum_{i = 1}^nh(X_i)w(X_i)
 $$
@@ -818,7 +846,7 @@ anti <- function(n){
   u <- runif(n, 0, 1)
   x.1 <- sqrt(16 - 2*log(u))
   x.2 <- sqrt(16 - 2*log(1 - u))
-  return(list(x.1 = x.1, x.2 = x.2))
+  list(x.1 = x.1, x.2 = x.2)
 }
 ```
 ### (b)
@@ -865,6 +893,8 @@ upper <- theta.as + qt(0.975, n - 1)*sigma.as
 
 c("conf.int.lower" = lower, "conf.int.upper" = upper, "precision" = 1/sigma.as^2)
 ```
+\textcolor{blue}{Hvordan er $\rho$ implementert her?}
+
 We observe that the precision is higher than for regular importance sampling. This can be explained be a negative correlation coefficient, $\rho$. To check this, we calculate the sample correlation:
 ```{r}
  c("sample.correlation" = cor(h.1*w.1, h.2*w.2))
