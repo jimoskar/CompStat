@@ -724,7 +724,7 @@ The results are reassuring.
 \newpage
 # Problem C
 ## C.1
-We observe that 
+Let $\mathbb{I}$ denote the indicator function. We observe that 
 $$
 \theta = \mathrm{Pr}\{X > 4\} = \int_4^{\infty}f(x)\ \text{d}x = \int_{-\infty}^{\infty}\mathbb{I}(x > 4) f(x)\ \text{d}x = \mathrm{E}_f[\mathbb{I}(X >4)].
 $$
@@ -756,7 +756,6 @@ $$
 &\approx \frac{1}{n}\left( \frac{1}{n-1} \sum_{i = 1}^n (h(x_i) - \hat\theta)^2 \right) =: \hat{\sigma}^2.
 \end{split}
 $$
-\textcolor{blue}{Dobbeltsjekk at dette riktig utregning ved bruk av indikatorfunksjonen?}
 
 We also utilize the central limit theorem, such that $\hat\theta \sim \mathcal{N}\left(\theta, \mathrm{Var}[\hat\theta]\right)$. Then we know that
 
@@ -771,7 +770,6 @@ $$
 It is computed and displayed below.
 ```{r}
 sigma.hat <- sqrt(1/(n*(n-1)) * sum((h - theta.hat)^2)) 
-1/sigma.hat^2
 lower <- theta.hat - qt(0.975, n - 1)*sigma.hat
 upper <- theta.hat + qt(0.975, n - 1)*sigma.hat
 
@@ -786,7 +784,7 @@ The CDF, $G(x)$, is thus given as
 $$
 G(x) = \int_4^{x}g(t)dt = 1 - \exp\left(-\frac{x^2}{2} - 8\right).
 $$
-It can easily be shown that $G^{-1}(x) = \sqrt{16-2\ln(1-x)}$, which we utilize in the inversion sampling algorithm below. Sanity check:
+It can easily be shown that $G^{-1}(u) = \sqrt{16-2\ln(1-u)}$, which we utilize in the inversion sampling algorithm below. We also conduct our usual sanity check by plotting the distribution of the samples together with the theoretical distribution.
 ```{r}
 inv.samp <- function(n){
   u <- runif(n, 0, 1)
@@ -805,7 +803,7 @@ ggplot(data.frame(x = sim)) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
-We note that $g(x) >0$ where $h(x)f(x) >0$ \textcolor{red}{show this??} \textcolor{blue}{Sara did say it is not necessary, but it is nice}. Then, in the importance sampling scheme, the estimator is given as
+Then, in the importance sampling scheme, the estimator is given as
 $$
 \hat\theta_{IS} = \frac{1}{n} \sum_{i = 1}^n\frac{h(X_i)f(X_i)}{g(X_i)} = \frac{1}{n} \sum_{i = 1}^nh(X_i)w(X_i)
 $$
@@ -841,9 +839,6 @@ lower <- theta.is - qt(0.975, n - 1)*sigma.is
 upper <- theta.is + qt(0.975, n - 1)*sigma.is
 
 c(lower, upper)
-1/sigma.is^2
-
-n*sigma.hat^2/sigma.is^2
 ```
 We define the precision of the estimators as the reciprocal of the variance of the estimators. Hence we have $\text{Precision}( \hat{\theta})$ = `r 1/(sigma.hat^2)` and $\text{Precision}(\hat{\theta}_{IS})$ =  `r 1/(sigma.is^2)`. We observe that the importance sampling yields a much more precise estimator. How many many samples would we have needed to achieve the same precision in C.1? Let $m$ denote the number of samples used to compute $\hat{\theta}$ and $n=100000$ the number of samples used to compute $\hat{\theta}_{IS}$. Then we want to find $m$ such that
 
@@ -854,7 +849,7 @@ $$
 \iff& m = n\frac{\mathrm{Var}_f[h(X)]}{\mathrm{Var}_g[h(X)w(X)]} \approx \text{`r n * sigma.hat^2/sigma.is^2`},
 \end{split}
 $$
-where we have used the sample variances computed earlier to create the estimate of $m$.
+where we have used the sample variances computed in the code above to create the estimate of $m$.
 
 
 ## C.3
@@ -866,7 +861,7 @@ $$
 where 
 
 $$
-\hat\theta_{IS}^{(1)} = \sum_{i = 1}^nh\left(X_i^{(1)}\right)w\left(X_i^{(1)}\right) \;\text{and}\quad \hat\theta_{IS}^{(2)} =  \sum_{i = 1}^nh\left(X_i^{(2)}\right)w\left(X_i^{(2)}\right)
+\hat\theta_{IS}^{(1)} = \frac{1}{n} \sum_{i = 1}^nh\left(X_i^{(1)}\right)w\left(X_i^{(1)}\right) \;\text{and}\quad \hat\theta_{IS}^{(2)} =  \frac{1}{n} \sum_{i = 1}^nh\left(X_i^{(2)}\right)w\left(X_i^{(2)}\right)
 $$
 are simulated by the same importance sampling procedure as in C.2, but the $X_j^{(1)}$'s are based on $u$ while the $X_j^{(2)}$'s are based on $u -1$ in the inversion sampling. The algorithm which samples $n$ antithetic pairs from $g$ is given below.
 ```{r}
@@ -878,7 +873,7 @@ anti <- function(n){
 }
 ```
 ### (b)
-Below, we generate $n = 50000$ pairs of antithetic variates which we use in the importance sampling. We choose $n$ as such because we generate pairs and $2n = 100000$, which is what we used in C.2.
+Below, we generate $n = 50000$ pairs of antithetic variates which we use in the importance sampling. We choose $n$ as such because we generate pairs and $2n = 100000$, which is what we used in C.2. An estimate of the antithetic sampler is given below.
 ```{r}
 n <- 50000
 c <- exp(8)
@@ -903,7 +898,7 @@ To compute a confidence interval, we first note the central limit theorem is sti
 $$
 \hat\theta_{AS} = \frac{1}{n}\sum_{i = 1}^n\frac{1}{2}\left(h\left(X_i^{(1)}\right)w\left(X_i^{(1)}\right) + h\left(X_i^{(2)}\right)w\left(X_i^{(2)}\right) \right) =: \frac{1}{n}\sum_{i = 1}^nY_i.
 $$
-We assume these $Y_i$'s to be independent, so that we can utilize the $t$-distribution when estimating the variance. We observe that the variance of the antithetic sampler is:
+We assume these $Y_i$'s to be independent, so that we can utilize the $t$-distribution when estimating the variance. We also observe that the variance of the antithetic sampler is:
 $$
 \begin{split}
 \mathrm{Var}\left[\hat\theta_{AS}\right] &= \frac{1}{4}\left(\mathrm{Var}\left[\hat\theta_{IS}^{(1)}\right] + \mathrm{Var} \left[\hat\theta_{IS}^{(2)}\right] + 2\mathrm{Cov}\left[ \hat\theta_{IS}^{(1)}, \hat\theta_{IS}^{(2)}\right]\right) \\
@@ -912,18 +907,18 @@ $$
 $$
 where $\sigma^2 = \mathrm{Var}[h(X)w(X)]$ and $\rho = \mathrm{Corr}\left[h(X^{(1)})w(X^{(1)}),h(X^{(2)})w(X^{(2)})\right]$. Finally, we compute an approximate 95% confidence interval: 
 ```{r}
-Y <- 1/2 * (h.1*w.1 + h.2*w.2)
-S.Y <- var(Y) # Sample variance of Y's
-sigma.as <- sqrt(S.Y/n) # Estimated sd of theta.as
+Y <- 1/2 * (h.1*w.1 + h.2*w.2) # Vector of Yi's
+S2.Y <- var(Y) # Sample variance of Y's
+sigma.as <- sqrt(S2.Y/n) # Estimated sd of theta.as
 
 lower <- theta.as - qt(0.975, n - 1)*sigma.as
 upper <- theta.as + qt(0.975, n - 1)*sigma.as
 
 c("conf.int.lower" = lower, "conf.int.upper" = upper, "precision" = 1/sigma.as^2)
 ```
-\textcolor{blue}{Hvordan er $\rho$ implementert her?}
 
-We observe that the precision is higher than for regular importance sampling. This can be explained be a negative correlation coefficient, $\rho$. To check this, we calculate the sample correlation:
+We observe that the precision is higher than for regular importance sampling. This can be explained by a negative correlation coefficient, $\rho$. To check this, we calculate the corresponding sample correlation:
+
 ```{r}
  c("sample.correlation" = cor(h.1*w.1, h.2*w.2))
 ```
