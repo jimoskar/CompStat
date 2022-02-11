@@ -935,7 +935,7 @@ As expected, the sample correlation is negative, which explains the increased pr
 # Problem D
 
 ## 1.
-We consider a multinomial distribution with mass function given by
+We consider a multinomial distribution with counts $y=begin{bmatrix}y_1 & y_2 & y_3 & y_4\end{bmatrix}^T$ and observed data $y = begin{bmatrix}125 & 18 & 20 & 34\end{bmatrix}^T$. The mass function is given as
 $$
 f(y \mid \theta) \propto (2+\theta)^{y_1}(1-\theta)^{y_2+y_3}\theta^{y_4},
 $$
