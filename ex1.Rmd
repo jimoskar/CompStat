@@ -40,8 +40,8 @@ sim.exp <- function(rate, n){
   -1/rate * log(u)
 }
 ```
-Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge using $\lambda = 0.5$ and $n = 1000$.
-```{r, cache=TRUE}
+Next, we need to check if this gives reasonable results by comparing our simulated values to the theoretical knowledge using $\lambda = 0.5$ and $n = 1000$. The result is shown in figure 1.
+```{r, cache=TRUE, fig.cap= "The theoretical density of the exponential distribution plotted with the distribution of our generetad samples." }
 rate <- 0.5
 n <- 10000
 sim <- data.frame(x = sim.exp(rate, n))
@@ -55,16 +55,19 @@ ggplot(sim) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) 
 ```
-We also compare the estimated mean and variance to first and second central moments of the exponential distribution:
+We also compare the estimated mean and variance to first and second central moments of the exponential distribution. The results are shown in figure 2 and 3.
 
-```{r}
+```{r, fig.cap="Theoretical mean plotted against sample mean for the exponential distribtion."}
 # Calculate the cumulative mean
 data.frame(n.samples = 1:n,
            mean = cumsum(sim$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = 1/rate, color = "red") +
   ggtitle("Mean")
-  
+```
+
+
+```{r, fig.cap="Theoretical variance plotted against sample mean for the exponential distribtion."}
 # Calculate the cumulative variance
 data.frame(n.samples = 1:n,
            mean = cumsum(sim$x)/(1:n),
@@ -162,9 +165,9 @@ G.inv <- function(alpha, u){
 }
 ```
 
-To test our implementation we use $\alpha = 0.5$ and simulate $n=10000$ samples.
+To test our implementation we use $\alpha = 0.5$ and simulate $n=10000$ samples. We plot the distribution of the samples with the exact density in figure 4.
 
-```{r}
+```{r, fig.cap="The theoretical density of g plotted with the distribution of our generetad samples."}
 alpha <- 0.5
 n <- 100000
 sim <- data.frame(x = sim.g(alpha, n))
@@ -214,7 +217,6 @@ c(mean.g, mean.est)
 c(var.g, var.est)
 ```
 We see that our simulation gives approximate correct values for the theoretical mean and variance.
-\textcolor{blue}{Legge til kumulativ mean og varians og se at de konvergerer for økende n. Akkurat som i oppgavene før.}
 
 ## A.3
 ### (a)
@@ -257,8 +259,8 @@ sim.sigm <- function(n, alpha){
   1/alpha * (log(u) - log(1-u))
 }
 ```
-We compare the simulated values with the theoretical distribution:
-```{r, cache = TRUE}
+We compare the simulated values with the theoretical distribution. This is done graphically in figure 5.
+```{r, cache = TRUE, fig.cap="The theoretical density of f plotted with the distribution of our generetad samples."}
 alpha <- 2
 n <- 1000000
 sim <- data.frame(x = sim.sigm(n, alpha))
@@ -317,8 +319,8 @@ box.mul <- function(n){
   }
 }
 ```
-As usual, we compare the results of a simulation against the theoretical distribution.
-```{r, cache=TRUE}
+As usual, we compare the results of a simulation against the theoretical distribution. This is done graphically in figure 6.
+```{r, cache=TRUE, fig.cap= "The theoretical density of the standard normal distribution plotted with the distribution of our generetad samples."}
 n <- 10000
 sim.box.mul <- data.frame(x = box.mul(n))
 x = seq(from = -5, to = 5, by = 0.1)
@@ -331,15 +333,18 @@ ggplot(sim.box.mul) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
-Finally, we compare the mean and variance resulting from the simulation with the theoretical values. 
-```{r}
+Finally, we compare the mean and variance resulting from the simulation with the theoretical values in figure 7 and 8, respectively. 
+```{r, fig.cap="Theoretical mean plotted against sample mean for the standard normal distribution."}
 # Mean
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.box.mul$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = 0, color = "red") +
   ggtitle("Mean")
-  
+```
+
+
+```{r, fig.cap="Theoretical variance plotted against sample variance for the standard normal distribution."}
 # Variance
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.box.mul$x)/(1:n),
@@ -375,8 +380,8 @@ sim.mvnorm <- function(mu, Sigma, n){
 }
 ```
 
-To test our implementation, we generate a bivariate normal distribution and plot some of the samples with the theoretical level curves:
-```{r}
+To test our implementation, we generate a bivariate normal distribution and plot some of the samples with the theoretical level curves. This can be viewed in figure 9.
+```{r, fig.cap="Simulated samples from the bivariate normal distribution plotted with the theoretical level curves."}
 # Bivariate example
 mu <- c(1,2)
 Sigma <- matrix(c(1, -.7, -.7, 2), 2)
@@ -396,7 +401,7 @@ for (i in 1:100) {
 }
 
 # Plot first 500 points
-plot(y[1,1:500], y[2,1:500], main="Bivariate normal distribution", 
+plot(y[1,1:500], y[2,1:500], 
      xlab="x", ylab="y", pch=16, cex = 0.4)
 contour(x.points, y.points, z, add = TRUE)
 ```
@@ -458,8 +463,8 @@ gamma.rej.samp <- function(n, alpha){
   result
 }
 ```
-We conduct our usual sanity check.
-```{r, cache=TRUE}
+We conduct our usual sanity check for $\alpha = 0.5$ and $n = 10000$ samples, shown in figure 10.
+```{r, cache=TRUE, fig.cap="The theoretical density of the gamma distribution plotted with the distribution of our samples generated with rejection sampling."}
 n <- 10000
 alpha <- 0.5
 
@@ -474,14 +479,19 @@ ggplot(sim.gamma.rej) +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
-```{r}
+
+We also plot the sample mean and variance against the theoretical values, shown in figure 11 og 12.
+```{r, fig.cap="Theoretical mean plotted against sample mean for the gamma distribution."}
 # Mean
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.gamma.rej$x)/(1:n)) %>%
   ggplot() + geom_line(aes(n.samples, mean)) +
   geom_hline(yintercept = alpha, color = "red") +
   ggtitle("Mean")
-  
+```
+
+
+```{r, fig.cap="Theoretical variance plotted against sample variance for the gamma distribution."}
 # Variance
 data.frame(n.samples = 1:n,
            mean = cumsum(sim.gamma.rej$x)/(1:n),
@@ -578,8 +588,8 @@ gamma.rou <- function(n, alpha){
 }
 ```
 
-First, we check that the simulation algorithm gives reasonable results:
-```{r, cache=TRUE}
+First, we check that the simulation algorithm gives reasonable results, by plotting the samples and the exact density in figure 13 with $\alpha =10$ $n=100000$ samples.
+```{r, cache=TRUE, fig.cap="The theoretical density of the gamma distribution plotted with the distribution of our generetad samples with ratio of uniforms method."}
 n <- 100000
 alpha <- 10
 
@@ -601,9 +611,9 @@ c("mean.theoretical" = alpha, "mean.sample" = mean(sim.gamma$sim))
 c("var.theoretical" = alpha, "var.sample" = var(sim.gamma$sim))
 ```
 
-Judging from the printout above, we conclude that the ratio of uniforms algorithm works correctly. Next we plot the necessary tries to sample $n=1000$ samples with this algorithm for $\alpha \in (0, 2000]$.
+Judging from the printout above, we conclude that the ratio of uniforms algorithm works correctly. Next we plot the necessary tries to sample $n=1000$ samples with this algorithm for $\alpha \in (0, 2000]$ in figure 14.
 
-```{r, cache = TRUE}
+```{r, cache = TRUE, fig.cap="The number of necessary trials is plotted against the parameter value."}
 n <- 1000 # Number of desired samples
 m <- 100 # Length of alpha vector
 alpha.vec <- seq(from = 1.01, to = 2000, length.out = m)
@@ -640,8 +650,8 @@ sample.gamma <- function(n, alpha, beta){
 }
 ```
 
-Since we have tested each of the functions which the above algorithm is comprised of, we do not conduct any extensive testing of it here, but we check that it gives sensible results for one combination of parameters.
-```{r, cache=TRUE}
+Since we have tested each of the functions which the above algorithm is comprised of, we do not conduct any extensive testing of it here, but we check that it gives sensible results for one combination of parameters, $\alpha = \beta = 3$, shown in figure 15. 
+```{r, cache=TRUE, fig.cap="The theoretical density of the gamma distribution plotted with the distribution of our generated samples  with the generic sampling function."}
 n <- 10000
 alpha <-  3
 beta <- 3
@@ -663,7 +673,7 @@ geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
 ## B.4
 
 ### (a)
-We repeat the problem description for completeness. Let $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$. Since $X$ and $Y$ are independent, their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$. Next, define $Z = \frac{X}{X + Y}$ and $V = X + Y$. Then, $X = ZV$ and $Y=V(1-Z)$, and, by the transformation formula, the joint density of $Z$ and $V$ is
+We repeat the problem description for completeness. Let $X \sim \text{Gamma}(\alpha, 1)$ and  $Y \sim \text{Gamma}(\beta, 1)$. Since $X$ and $Y$ are independent, their joint density is $f_{X,Y}(x,y) = f_X(x)f_Y(y)$. Next, define $Z = \frac{X}{X + Y}$ and $V = X + Y$. Then $X = ZV$ and $Y=V(1-Z)$. By the transformation formula, the joint density of $Z$ and $V$ is
 
 $$
 \begin{split}
@@ -695,8 +705,8 @@ sim.beta <- function(n, alpha, beta){
 }
 ```
 
-We check that the distribution of the samples matches the theoretical distribution for $\alpha = 2$ and $\beta = 10$.
-```{r}
+We check that the distribution of the samples matches the theoretical density for $\alpha = 2$ and $\beta = 10$. This is done in figure 16.
+```{r, fig.cap=" The theoretical density of the beta distribution plotted with the distribution of our generated samples."}
 n <- 100000
 alpha <-  2
 beta <- 10
@@ -778,14 +788,14 @@ c(lower, upper)
 ## C.2
 To simulate from $g$, we need to find the normalization constant:
 $$
-1 = \int_4^{\infty}g(x)dx = -c\exp\left(-\frac{x^2}{2}\right)\Big|_4^{\infty} \iff c= \exp(8).
+1 = \int_4^{\infty}g(x)dx = -c\exp\left(-\frac{x^2}{2}\right)\Bigg|_4^{\infty} \iff c= e^8.
 $$
-The CDF, $G(x)$, is thus given as
+The cumulative distribution, $G(x)$, is thus given as
 $$
 G(x) = \int_4^{x}g(t)dt = 1 - \exp\left(-\frac{x^2}{2} - 8\right).
 $$
-It can easily be shown that $G^{-1}(u) = \sqrt{16-2\ln(1-u)}$, which we utilize in the inversion sampling algorithm below. We also conduct our usual sanity check by plotting the distribution of the samples together with the theoretical distribution.
-```{r}
+It can easily be shown that $G^{-1}(u) = \sqrt{16-2\ln(1-u)}$, which we utilize in the inversion sampling algorithm below. We also conduct our usual sanity check by plotting the distribution of the samples together with the theoretical distribution in figure 17.
+```{r,  fig.cap="The theoretical density of g plotted with the distribution of our generated samples."}
 inv.samp <- function(n){
   u <- runif(n, 0, 1)
   x <- sqrt(16 - 2*log(1 - u))
@@ -929,8 +939,8 @@ As expected, the sample correlation is negative, which explains the increased pr
 \newpage
 # Problem D
 
-## 1.
-We consider a multinomial distribution with counts $y=begin{bmatrix}y_1 & y_2 & y_3 & y_4\end{bmatrix}^T$ and observed data $y = begin{bmatrix}125 & 18 & 20 & 34\end{bmatrix}^T$. The mass function is given as
+## D.1
+We consider a multinomial distribution with counts $y=\begin{bmatrix}y_1 & y_2 & y_3 & y_4\end{bmatrix}^T$ and observed data $y = \begin{bmatrix}125 & 18 & 20 & 34\end{bmatrix}^T$. The mass function is given as
 $$
 f(y \mid \theta) \propto (2+\theta)^{y_1}(1-\theta)^{y_2+y_3}\theta^{y_4},
 $$
@@ -983,7 +993,7 @@ sim.rej.D <- function(n, y = c(125, 18, 20, 34)){
 }
 ```
 
-## 2.
+## D.2
 We denote the posterior mean of $\theta$ by $\mu_{\theta} = \text{E}(f(\theta\mid y))$. Using Monte-Carlo integration, the mean can be estimated as
 $$
 \hat \mu_{\theta} = \frac1M \sum_{i=1}^M \theta_i,
@@ -997,9 +1007,9 @@ mu.theta <- mean(samples)
 mu.theta
 ```
 
-Using $M=10000$ samples, Monte-Carlo integration gives the estimate $\hat \mu_{\theta} =$ `r mu.theta`. Next we perform our usual sanity check and draws a vertical line indicating the mean.
+Using $M=10000$ samples, Monte Carlo integration gives the estimate $\hat \mu_{\theta} =$ `r mu.theta`. Next we perform our usual sanity check and draw a vertical line indicating the mean, shown in figure 18.
 
-```{r}
+```{r, fig.cap="The posterior density of the parameter in the multinomial distribution plotted with our generated samples. The vertical black line corresponds to the Monte Carlo estimated mean."}
 sim.rej <- data.frame(x = samples)
 
 # Posterior density (up to a multiplicative constant)
@@ -1034,7 +1044,7 @@ mu.num$value
 ```
 We see that the estimate of the mean obtained using Monte Carlo integration, $\hat \mu_{\theta} =$ `r mu.theta`, is close to the numerical value $\hat \mu_{\theta}^{\text{(num)}} =$ `r mu.num$value`.
 
-## 3.
+## D.3
 To get an estimate for how many generations our algorithm needs on average to produce one sample, we can first find the acceptance rate using Monte-Carlo simulation. Then the average number of samples needed is equal to the inverse of the acceptance rate. To find this practically, we simply count how many generations is needed for a large number of samples and divide by the total number of samples generated.
 
 In addition to the practical approach, a numerical estimate can be carried out by calculating the expected acceptance rate. Let the acceptance rate be $\alpha(\theta) = \frac{\tilde f(\theta\mid y)}{\tilde c\ g(\theta)}$. Then the expected value is
@@ -1055,7 +1065,7 @@ acc.rate.numerical <- integrate(f,0,1)$value / c
 ```
 We see that the average number of generations needed to produce one sample are calculated practically as `r 1/acc.rate.practical` and numerically as `r 1/acc.rate.numerical`. The practical estimate is close to the numerical value, as expected.
 
-## 4.
+## D.4
 Now we assume that the prior density is $g(\theta) = \text{Beta}(1,5) = 5(1-\theta)^4$. The new posterior density then becomes
 $$
 f_2(\theta\mid y) \propto f(y \mid\theta)\ 5 (1-\theta)^4 \propto 5(2+\theta)^{y_1}(1-\theta)^{4+ y_2+y_3}\theta^{y_4} \qquad \text{for}\quad \theta \in (0,1),
