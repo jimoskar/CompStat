@@ -116,12 +116,12 @@ $$
 G^{-1}(u) =
 \begin{cases}
 \left(\dfrac{\alpha u}{c}\right)^{-\alpha}, & 0 \le u < \dfrac{c}{\alpha} \\
--\ln\left(\dfrac{1-u}{c}\right), & \dfrac{c}{\alpha} \le u
-\end{cases}.
+-\ln\left(\dfrac{1-u}{c}\right), & \dfrac{c}{\alpha} \le u \le 1.
+\end{cases}
 $$
 
 ### (b)
-Firstly, we implement $g$ and an algorithm to generate samples from $g$:
+First we implement $g$ and an algorithm to generate samples from $g$:
 ```{r}
 g <- function(alpha, x){
   # Normalizing constant
@@ -166,9 +166,9 @@ To test our implementation we use $\alpha = 0.5$ and simulate $n=10000$ samples.
 
 ```{r}
 alpha <- 0.5
-n <- 10000
+n <- 100000
 sim <- data.frame(x = sim.g(alpha, n))
-x = seq(from = 0.002, to = 5, by = 0.05)
+x = seq(from = 0.01, to = 4, by = 0.05)
 exact <- data.frame(x = x, y = g(alpha, x))
 
 ggplot(sim) + 
@@ -177,21 +177,21 @@ ggplot(sim) +
   geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
   scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2")) + 
-  coord_cartesian(xlim=c(0, 5))
+  coord_cartesian(xlim=c(0, 4))
 ```
-From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density. Next we find the theoretical mean and variance and compare with the estimated values. The theoretical mean is given by
+From the histogram, we see that we are able to generate samples from $g$ corresponding to the true density. Next we find the theoretical mean and variance and compare with the estimated values. Let $X \sim g(x)$. The theoretical mean is then given by
 $$
-\mu_g := \int_{-\infty}^{\infty} x\ g(x)\ \text{d}x = c \int_{0}^1 x^{\alpha}\ \text{d}x + c \int_{1}^{\infty} x e^{-x}\ \text{d}x = \frac{c}{\alpha+1} + \frac{2c}{e}.
+\mathrm{E}[X] = \int_{-\infty}^{\infty} x\ g(x)\ \text{d}x = c \int_{0}^1 x^{\alpha}\ \text{d}x + c \int_{1}^{\infty} x e^{-x}\ \text{d}x = \frac{c}{\alpha+1} + \frac{2c}{e}.
 $$
-Similarly, we find the variance
+Similarly, we find the theoretical variance to be
 $$
 \begin{split}
-\text{Var}_g & := \int_{-\infty}^{\infty} x^2 f(x)\ \text{d}x - \mu_g^2 \\
+\text{Var}[X] & = \int_{-\infty}^{\infty} x^2 f(x)\ \text{d}x - \mu_g^2 \\
 & = c \int_0^1 x^{\alpha + 1}\ \text{d}x + c \int_{1}^{\infty} x^2 e^{-x}\ \text{d}x - \mu_g^2\\
 & = \frac{c}{\alpha+2} + \frac{5c}{e} - \left(\frac{c}{\alpha+1} + \frac{2c}{e}\right)^2.
 \end{split}
 $$
-Comparing the true mean and variance with estimated values: \textcolor{red}{ikke plott her?}
+Comparing the true mean and variance with estimated values:
 ```{r}
 alpha <- 0.5
 c <- (1/alpha + exp(-1))^-1
@@ -252,16 +252,16 @@ $$
 Since we have an analytic expression for the inverse, we can again use the \textit{inversion method} to sample from $f$. The sampling-function is given as follows.
 
 ```{r}
-sim.sigm <- function(alpha, n){
+sim.sigm <- function(n, alpha){
   u <- runif(n,0,1)
-  1/alpha * log(u/(1-u))
+  1/alpha * (log(u) - log(1-u))
 }
 ```
 We compare the simulated values with the theoretical distribution:
 ```{r, cache = TRUE}
 alpha <- 2
-n <- 10000
-sim <- data.frame(x = sim.sigm(alpha, n))
+n <- 1000000
+sim <- data.frame(x = sim.sigm(n, alpha))
 x = seq(from = -10, to = 10, by = 0.1)
 exact <- data.frame(x = x, y = alpha*exp(alpha*x)/(1 + exp(alpha*x))^2)
 
@@ -273,9 +273,25 @@ ggplot(sim) +
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
 
-To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. \textcolor{red}{Think maybe the mean is undefined??}\textcolor{blue}{Den er vel åpenbart null?}
+To compare the simulated values with the theoretical mean and variance, we first need to compute the expression of these moments. Let $X \sim f(x)$. Then 
 
-\textcolor{blue}{Jeg tror vi skal legge til en sammenligning til teoretisk mean (=0?) og varians.}
+$$
+\mathrm{E}[X] = \int_{-\infty}^\infty \frac{\alpha xe^{\alpha x}}{(1 + e^{\alpha x})^2}dx = 0,
+$$
+because the integrand is an odd function. The sample mean of our simulation is computed below
+```{r}
+mean(sim$x)
+```
+We see that the sample mean is approximately zero. Next, the theoretical variance is given as
+
+$$
+\mathrm{Var}[X] = \mathrm{E}[X^2] = \int_{-\infty}^\infty \frac{\alpha x^2e^{\alpha x}}{(1 + e^{\alpha x})^2}dx,
+$$
+for which we were not able to find a closed form. Therefore, we consider the variance when $\alpha = 2$. Then, $\mathrm{Var}[X] = \frac{\pi^2}{12} \approx 0.8225$, and the sample variance is computed to be
+```{r}
+var(sim$x)
+```
+which showcases that the simulation algorithm works as intended.
 
 ## A.4
 To generate samples from the standard normal distribution, we make use of the Box-Muller algorithm. Our implementation of the algorithm is given below:
@@ -521,14 +537,17 @@ Finally, $b_{-} = - \sqrt{\sup_{x \le 0} x^2f^*(x)} = - \sqrt{0} = 0$.
 
 ### (b)
 
-The algorithm which uses the ratio of uniforms-method to sample from the gamma distribution with $\alpha >0$ and $\beta = 1$ is given below. Note that the algorithm is implemented on the log scale.
+The algorithm which uses the ratio of uniforms-method to sample from the gamma distribution with $\alpha >0$ and $\beta = 1$ is given below. Note that the algorithm is implemented on the log scale in order to avoid numerical overflow. Hence, we sample from $Y = \ln X$, where $X\sim \mathcal{U}_{[a,b]}$, in stead of sampling directly from $X$. To achieve this, we have first found the CDF of $Y$ and then used the inversion method.
+
 ```{r}
+# Function to sample from log(Uniform)
 samp.log.unif <- function(n, log.b){
   u <- runif(n)
   x <- log.b + log(u) # log((b-a)*u + a) = log(b) + log(u) when a = 0.
   return(x)
 }
 
+# Function for the log of the core of the gamma distribution.
 log.core.gamma <- function(x, alpha){
   if(x <= 0){return(-Inf)}
   else{return((alpha - 1)*log(x) - x)}
@@ -576,6 +595,13 @@ geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
   scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 
 ```
+The algorithm seems to yield reasonable results. We also compare the simulation with theoretical mean and variance of the distribution.
+```{r}
+c("mean.theoretical" = alpha, "mean.sample" = mean(sim.gamma$sim))
+c("var.theoretical" = alpha, "var.sample" = var(sim.gamma$sim))
+```
+
+Judging from the printout above, we conclude that the ratio of uniforms algorithm works correctly. Next we plot the necessary tries to sample $n=1000$ samples with this algorithm for $\alpha \in (0, 2000]$.
 
 ```{r, cache = TRUE}
 n <- 1000 # Number of desired samples
@@ -598,45 +624,27 @@ Recall that the gamma distribution has probability density function given as
 $$
 f(x) = \frac{\beta^\alpha}{\Gamma(\alpha)}x^{\alpha -1}e^{-\beta x}.
 $$
-We use Marsaglia and Tsang’s method to generate from the gamma distribution:
-```{r}
-marsa.tsang <- function(n, alpha, beta){
-  d <- alpha - 1/3
-  c <- 1/sqrt(9*d)
-  count <- 0
-  result <- rep(0, n)
-  while(count < n){
-    z <- box.mul(1)
-    u <- runif(1, 0, 1)
-    v <- (1 + c*z)^3
-    if(z > -1/c && log(u) < 0.5*z^2 + d - d*v + d*log(v)){
-      result[count + 1] = d*v
-      count <- count + 1
-    }
-  }
-  return(1/beta * result)
-}
-```
+Since $\beta$ is an inverse scale parameter, we can sample from $\mathrm{Gamma}(\alpha, 1)$ and then divide the result by $\beta$, in stead of sampling directly from the distribution. We have created algorithms which generates samples from the gamma distribution for $\alpha < 1$ (rejection sampling) and for $\alpha > 1$ (ratio of uniforms). When $X \sim \mathrm{Gamma}(1, \beta)$, i.e $\alpha = 1$, $X \sim \mathrm{Exp}(\beta)$, so we can simply use the algorithm we implemented for the exponential distribution. The algorithm which generates samples from $\mathrm{Gamma}(\alpha, \beta)$ is given below.
 
-```{r}
+```{r, cache = TRUE}
 sample.gamma <- function(n, alpha, beta){
   if(alpha == 1){
     return(sim.exp(beta, n))
   } else if( alpha < 1){
     return(gamma.rej.samp(n, alpha)/beta)
   } else if( alpha > 1) {
-    return(gamma.rou(n, alpha)/beta)
+    return(gamma.rou(n, alpha)$sim/beta)
   } else{
     stop("Invalid value of alpha")
   }
 }
 ```
 
-Next, we check if our simulation algorithm gives sensible results.
+Since we have tested each of the functions which the above algorithm is comprised of, we do not conduct any extensive testing of it here, but we check that it gives sensible results for one combination of parameters.
 ```{r, cache=TRUE}
 n <- 10000
-alpha <-  1
-beta <- 2
+alpha <-  3
+beta <- 3
 
 sim.gamma <- sample.gamma(n, alpha, beta)
 x = seq(from = 0.1, to = 12, by = 0.1)
@@ -679,19 +687,39 @@ To generate a vector of $n$ independent samples from a beta distribution with pa
 ```{r}
 sim.beta <- function(n, alpha, beta){
   # Generate n samples from Gamma(alpha, 1) and Gamma(beta, 1)
-  x <- gamma.rej.samp(n, alpha)
-  y <- gamma.rej.samp(n, beta)
+  x <- sample.gamma(n, alpha, 1)
+  y <- sample.gamma(n, beta, 1)
   
   # Return z=x/(x+y), n independent values from the Beta(alpha, beta)
   x/(x+y)
 }
 ```
 
-\textcolor{blue}{Vi må sjekke at simuleringsfunksjonen fungerer som den skal med et eksempel.}
+We check that the distribution of the samples matches the theoretical distribution for $\alpha = 2$ and $\beta = 10$.
 ```{r}
-z <- sim.beta(10000, 5, 2)
-hist(z)
+n <- 100000
+alpha <-  2
+beta <- 10
+
+sim.beta <- sim.beta(n, alpha, beta)
+x = seq(from = 0.01, to = 1, by = 0.01)
+exact <- data.frame(x = x, y = gamma(alpha + beta)/(gamma(alpha)*gamma(beta)) * x^(alpha - 1) * (1 - x)^(beta - 1))
+
+ggplot(data.frame(x = sim.beta)) + 
+geom_histogram(aes(x = x, y = ..density.., fill = "Simulated"),
+                 alpha = 0.8, binwidth = 0.01) + 
+  geom_line(data = exact , aes(x = x, y = y, color = 'Exact'))  +
+  scale_color_manual(name = "", values = c("Exact" = "#e0474c")) +
+  scale_fill_manual(name = "", values = c("Simulated" = "#69b3a2"))
 ```
+We also compare the sample mean and variance to the theoretical values.
+```{r}
+c("mean.theoretical" = alpha/(alpha + beta), "mean.sample" = mean(sim.beta))
+c("var.theoretical" = alpha*beta/((alpha + beta)^2*(alpha + beta + 1)),
+  "var.sample" = var(sim.beta))
+```
+
+The results are reassuring.
 
 \newpage
 # Problem C
