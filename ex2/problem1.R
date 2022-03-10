@@ -14,10 +14,6 @@ n <- rep(39, T) # n in binom. distr.
 n[60] = 10 # corrigate for feb 29th
 y <- rain$n.rain # response
 
-# Parameters for sigma prior
-alpha <- 1
-beta <- 2
-
 # Sigmoid function
 sigm <- function(tau){
   return(exp(tau)/(1 + exp(tau)))
@@ -66,19 +62,19 @@ Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
 Q[1,1] <- Q[T,T] <- 1
 
+# MCMC with iterative conditioning
 mcmc.iterative <- function(iter, sigma0, tau0){
   tau.mat <- matrix(NA, nrow = iter, ncol = T)
   tau.mat[1, ] <- tau0
   sigma.vec <- rep(NA, iter)
   sigma.vec[1] <- sigma0
   for(i in 2:iter){
-    # sample tau
+    # Sample tau
     for(j in 1:T){
       # Generate proposal
       q.tt <- 1/sigma.vec[i-1] * Q[j,j]
       q.t <- calc.q.t(j)
       
-      #browser()
       Q.AA <- 1/sigma.vec[i - 1] * q.tt
       Q.AB <- 1/sigma.vec[i - 1] * t(q.t)
       mu.AgB <- 1/Q.AA * Q.AB %*% (tau.mat[i -1, 1:T != j])
@@ -93,8 +89,7 @@ mcmc.iterative <- function(iter, sigma0, tau0){
       u <- runif(1)
       if(u < alpha){
         tau.mat[i, j] = tau.prop
-      }
-      else{
+      } else{
         tau.mat[i, j] = tau.mat[i-1, j]
       }
     }
@@ -106,9 +101,12 @@ mcmc.iterative <- function(iter, sigma0, tau0){
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec))
 }
 
-# Run MCMC
-iter <- 1000
-set.seed(4300)
-mcmc <- mcmc.iterative(iter, runif(1,0,5), runif(T))
-plot(1:iter, mcmc$sigma.vec, type = "l", ylim = c(0, 1))
+# Parameters for sigma prior
+alpha <- 10
+beta <- 20
 
+# Run MCMC
+iter <- 10000
+set.seed(4300)
+mcmc <- mcmc.iterative(iter, 10, runif(T))
+plot(1:iter, mcmc$sigma.vec, type = "l", ylim = c(0,0.1))
