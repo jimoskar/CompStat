@@ -33,8 +33,6 @@ rigamma <- function(n, a, b){
 
 # Function to calculate right part of accept. prob.
 calc.alpha <- function(t, tau.prop, tau.old){
-  pi.prop <- sigm(tau.prop)
-  pi.old <- sigm(tau.old)
   log.frac <- y[t]*(log.sigm(tau.prop) - log.sigm(tau.old)) + 
                       (n[t] - y[t])*(log.1m.sigm(tau.prop) - log.1m.sigm(tau.old))
   if(t == 60){
@@ -43,52 +41,37 @@ calc.alpha <- function(t, tau.prop, tau.old){
   return(exp(log.frac))
 }
 
-# Function for returning qt
-calc.q.t <- function(t){
-  q <- rep(0, T - 1)
-  if(t == 1){
-    q[1] = -1
-  } else if(t == T){
-    q[T - 1] <= -1
-  } else{
-    q[t - 1] = q[t] = -1
-  }
-  return(q)
-}
-
-
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
 Q[1,1] <- Q[T,T] <- 1
 
 # MCMC with iterative conditioning
-mcmc.iterative <- function(iter, sigma0, tau0){
-  tau.mat <- matrix(NA, nrow = iter, ncol = T)
+mcmc.iterative <- function(num.iter, sigma0, tau0){
+  tau.mat <- matrix(NA, nrow = num.iter, ncol = T)
   tau.mat[1, ] <- tau0
-  sigma.vec <- rep(NA, iter)
+  sigma.vec <- rep(NA, num.iter)
   sigma.vec[1] <- sigma0
-  for(i in 2:iter){
+  count <- 0 # Count of accepted tau-samples
+  
+  for(i in 2:num.iter){
     # Sample tau
     for(j in 1:T){
       # Generate proposal
-      q.tt <- 1/sigma.vec[i-1] * Q[j,j]
-      q.t <- calc.q.t(j)
+      Q.AA <- 1/sigma.vec[i-1] * Q[j,j]
+      Q.AB <- 1/sigma.vec[i-1] * Q[j, ]
+      Q.AB <- Q.AB[1:T != j]
       
-      Q.AA <- 1/sigma.vec[i - 1] * q.tt
-      Q.AB <- 1/sigma.vec[i - 1] * t(q.t)
-      mu.AgB <- 1/Q.AA * Q.AB %*% (tau.mat[i -1, 1:T != j])
-      Q.AgB <- q.tt
+      mu.AgB <- -1/Q.AA * Q.AB %*% (tau.mat[i - 1, 1:T != j])
+      Q.AgB <- Q.AA
       tau.prop <- rnorm(1, as.numeric(mu.AgB), solve(Q.AgB))
       
       # Calculate acceptance prob.
       alpha <- min(1, calc.alpha(j, tau.prop, tau.mat[i - 1, j]))
-      if(is.na(alpha)){
-        browser()
-      }
       u <- runif(1)
       if(u < alpha){
         tau.mat[i, j] = tau.prop
+        count <- count + 1
       } else{
         tau.mat[i, j] = tau.mat[i-1, j]
       }
@@ -98,15 +81,15 @@ mcmc.iterative <- function(iter, sigma0, tau0){
     scale <- 0.5*t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
     sigma.vec[i] <- rigamma(1, shape, scale)
   }
-  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec))
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count))
 }
 
 # Parameters for sigma prior
-alpha <- 10
-beta <- 20
+alpha <- 2
+beta <- 0.05
 
 # Run MCMC
-iter <- 10000
 set.seed(4300)
-mcmc <- mcmc.iterative(iter, 10, runif(T))
-plot(1:iter, mcmc$sigma.vec, type = "l", ylim = c(0,0.1))
+num.iter <- 50000
+mcmc <- mcmc.iterative(num.iter, sigma0 =  0.2, tau0 = runif(T))
+plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
