@@ -10,6 +10,12 @@ mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 (proc.time() - ptm)[3] # Computation time
 
+mod$summary.random
+
+plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+  
+plot(inla.smarginal(m))
+
 #Run inla.doc("rw1") for documentation provided by INLA on its built-in RW(1) model
 inla.doc("rw1")
 
@@ -28,3 +34,4 @@ mod <- inla(n.rain ~ f(day, model="rw1", constr=TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 
 summary(mod)
+

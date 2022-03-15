@@ -27,9 +27,9 @@ log.1m.sigm <- function(tau){
   return(-log(exp(tau) + 1))
 }
 
-# Funciton to sample from inverse gamma
+# Function to sample from inverse gamma
 rigamma <- function(n, a, b){
-  # uses shape and scale
+  # Uses shape and scale
   return(1/rgamma(n, shape = a, rate = 1/b))
 }
 
@@ -80,9 +80,9 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       }
     }
     # Generate Gibbs sample for sigma
-    shape <- alpha + 0.5
+    shape <- alpha + T/2
     scale <- 0.5*t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
-    sigma.vec[i] <- rigamma(1, shape, scale)
+    sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
   }
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count))
 }
@@ -93,6 +93,32 @@ beta <- 0.05
 
 # Run MCMC
 set.seed(4300)
+num.iter <- 50000
+ptm <- proc.time() # For computation time
+mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = runif(T))
+(proc.time() - ptm)[3] # Computation time of MCMC
+
+# Some plotting
+plot(1:num.iter, mcmc$sigma.vec, type = "l")
+plot(1:num.iter, mcmc$tau.mat[,300], type = "l")
+hist(mcmc$tau.mat[,366], breaks = 100, freq = FALSE, add = TRUE)
+hist(mcmc$sigma.vec, breaks = 100, freq = FALSE)
+
+
+mcmc.df <- data.frame(x = 1:num.iter, tau1 = mcmc$tau.mat[, 1],
+                      tau201 = mcmc$tau.mat[, 201], tau366 = mcmc$tau.mat[, 366], sigma = mcmc$sigma.vec)
+# Trace plots
+ggplot(mcmc.df) + 
+  geom_line(aes(x = x, y = tau1)) + theme_minimal()
+ggplot(mcmc.df) + 
+  geom_line(aes(x = x, y = sigma)) + theme_minimal()
+
+mcmc.1k <- mcmc.iterative(1000, sigma0 =  0.02, tau0 = runif(T))
+plot(501:1000, tail(mcmc.1k$sigma.vec, 500), type = "l")
+hist(tail(mcmc.1k$sigma.vec, 500), breaks = 20)
+mcmc.1k$sigma.vec
+
+# Martin's code
 num.iter <- 500 # 50000 will take about 30 min on my system
 ptm <- proc.time()
 mcmc <- mcmc.iterative(num.iter, sigma0 =  0.2, tau0 = runif(T))
@@ -115,3 +141,4 @@ y$gamma.hat
 
 
 
+>>>>>>> f34e13b92a6c4332ce850042671ae439671cc118
