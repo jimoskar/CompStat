@@ -1,5 +1,6 @@
 ### Problem 1 ----
 library(ggplot2)
+library(MASS)
 load("rain.rda")
 
 # sample autocorrelation
@@ -44,7 +45,6 @@ calc.alpha <- function(t, tau.prop, tau.old){
 }
 
 # Construct Q without the 1/sigma factor
-T <- 10
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
 Q[1,1] <- Q[T,T] <- 1
@@ -118,27 +118,124 @@ plot(501:1000, tail(mcmc.1k$sigma.vec, 500), type = "l")
 hist(tail(mcmc.1k$sigma.vec, 500), breaks = 20)
 mcmc.1k$sigma.vec
 
+
+
+
+
+
+
+
+
+
+
 # Martin's code
+library(ggplot2)
+library(MASS)
+load("rain.rda")
+
+# sample autocorrelation
+source('sacf.R')
+
+T <- 366
+n <- rep(39, T)
+n[60] = 10
+alpha <- 2
+beta <- 0.05
+
+# response
+y <- rain$n.rain
+# Construct Q (without the 1/sigma2 factor)
+Q <- diag(rep(2, T))
+Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
+Q[1,1] <- Q[T,T] <- 1
+
 num.iter <- 500 # 50000 will take about 30 min on my system
-ptm <- proc.time()
-mcmc <- mcmc.iterative(num.iter, sigma0 =  0.2, tau0 = runif(T))
-print(proc.time() - ptm)
-
-plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
 
 
-
-x <- rnorm(100)
-
-y <- sacf(x)
-
-y$gamma.hat
+# "expit"/"sigmoid" function
+expit <- function(x){
+  1/(exp(-x)+1)
+}
 
 
+# Negative logarithmic "expit"
+neg.log.expit <- function(x){
+  log(exp(-x)+1)
+}
+
+
+# Function to sample from inverse gamma
+rigamma <- function(n, shape, scale){
+  # Uses shape and scale
+  return(1/rgamma(n, shape = shape, rate = 1/scale))
+}
+
+tau.accept <- function(t, tau.prop, tau.curr){
+  log.acc <- y[t] * ( neg.log.expit(tau.curr) - neg.log.expit(tau.prop) ) +
+      (y[t] - n[t]) * ( neg.log.expit(-tau.curr) - neg.log.expit(-tau.prop) )
+  
+  exp(log.acc)
+}
+
+
+MCMCMC <- function(n.iter, tau, sigma2){
+  # length of tau
+  T <- length(tau)
+  
+  # store tau and sigma2 for all the iterations
+  tau.mat       <- matrix(NA, nrow = length(tau), ncol = n.iter+1)
+  sigma2.vec    <- rep(NA, n.iter+1)
+  tau.mat[,1]   = tau
+  sigma2.vec[1] = sigma2
+  
+  for(i in 1:n.iter){
+    # MH steps for tau
+    for(t in 1:T){
+      mt <- (1:T)[-t]
+      Q.AA <- Q[t,t]
+      Q.AB <- Q[t,mt]
+      
+      # tau.A conditioned on tau.B
+      mu.cond <- -1/Q.AA * Q.AB %*% tau.mat[mt, i]
+      Q.cond <- Q.AA
+      
+      # Generate proposal
+      tau.proposal <- rnorm(1, as.numeric(mu.cond), sigma2.vec[i]/Q.cond)
+      
+      # Calculate acceptance probability
+      alpha <- tau.accept(t, tau.proposal, tau.mat[t,i])
+      
+      # Draw from uniform distribution
+      u <- runif(1)
+      if(u < alpha){
+        tau.mat[t, i+1] = tau.proposal
+      } else{
+        tau.mat[t, i+1] = tau.mat[t, i]
+      }
+    }
+    # Gibbs step for sigma2
+    
+    shape <- alpha + (T-1)/2
+    scale <- 0.5*t(tau.mat[,i]) %*% Q %*% tau.mat[, i] + beta
+    sigma2.vec[i+1] <- rigamma(1, shape = shape, scale = scale)
+  }
+  
+  list("tau" = tau.mat, "sigma2" = sigma2.vec)
+}
+
+# set some initial values
+tau.0 <- runif(366, min=-3, max=0)
+pi.0 <- expit(tau.0)
+sigma2.0 <- 0.2
+
+# test the MCMC algorithm
+time <- proc.time()
+run <- MCMCMC(1000, tau.0, sigma2.0)
+print(proc.time()-time)
+
+
+plot(run$sigma, type = 'l')
 
 
 
 
-
-
->>>>>>> f34e13b92a6c4332ce850042671ae439671cc118
