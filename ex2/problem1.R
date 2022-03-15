@@ -91,7 +91,11 @@ beta <- 0.05
 # Run MCMC
 set.seed(4300)
 num.iter <- 50000
+ptm <- proc.time() # For computation time
 mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = runif(T))
+(proc.time() - ptm)[3] # Computation time of MCMC
+
+# Some plotting
 plot(1:num.iter, mcmc$sigma.vec, type = "l")
 plot(1:num.iter, mcmc$tau.mat[,300], type = "l")
 hist(mcmc$tau.mat[,366], breaks = 100, freq = FALSE, add = TRUE)
@@ -110,3 +114,28 @@ mcmc.1k <- mcmc.iterative(1000, sigma0 =  0.02, tau0 = runif(T))
 plot(501:1000, tail(mcmc.1k$sigma.vec, 500), type = "l")
 hist(tail(mcmc.1k$sigma.vec, 500), breaks = 20)
 mcmc.1k$sigma.vec
+
+# Martin's code
+num.iter <- 500 # 50000 will take about 30 min on my system
+ptm <- proc.time()
+mcmc <- mcmc.iterative(num.iter, sigma0 =  0.2, tau0 = runif(T))
+print(proc.time() - ptm)
+
+plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> f34e13b92a6c4332ce850042671ae439671cc118

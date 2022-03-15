@@ -1,5 +1,8 @@
+### Problem 2 ----
+
 library(INLA)
 load("rain.rda")
+
 control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
 ptm <- proc.time() # To calculate computation time
 mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
@@ -12,3 +15,23 @@ mod$summary.random
 plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
   
 plot(inla.smarginal(m))
+
+#Run inla.doc("rw1") for documentation provided by INLA on its built-in RW(1) model
+inla.doc("rw1")
+
+
+## a) ----
+
+
+## b) ----
+
+
+## c) ----
+
+# We consider the following model in INLA:
+mod <- inla(n.rain ~ f(day, model="rw1", constr=TRUE),
+            data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
+            family="binomial", verbose=TRUE, control.inla=control.inla)
+
+summary(mod)
+
