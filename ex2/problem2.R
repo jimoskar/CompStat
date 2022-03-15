@@ -1,12 +1,14 @@
 library(INLA)
 load("rain.rda")
 control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
+ptm <- proc.time() # To calculate computation time
 mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
+(proc.time() - ptm)[3] # Computation time
 
-install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+mod$summary.random
 
-
-install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
-install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+  
+plot(inla.smarginal(m))
