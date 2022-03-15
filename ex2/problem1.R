@@ -2,10 +2,12 @@
 library(ggplot2)
 load("rain.rda")
 
+# sample autocorrelation
+source('sacf.R')
+
 ## a) ----
-head(rain)
 ggplot(rain, aes(x = day, y = n.rain)) + 
-  geom_jitter() + geom_smooth() + 
+  geom_point() + geom_smooth() + xlab("Day in year") + ylab("Number of days rain exceeds 1mm") +
   theme_minimal()
 
 ## e) ----
@@ -42,6 +44,7 @@ calc.alpha <- function(t, tau.prop, tau.old){
 }
 
 # Construct Q without the 1/sigma factor
+T <- 10
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
 Q[1,1] <- Q[T,T] <- 1
@@ -99,11 +102,11 @@ plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
 
 
 
+x <- rnorm(100)
 
+y <- sacf(x)
 
-
-
-
+y$gamma.hat
 
 
 
