@@ -90,6 +90,25 @@ beta <- 0.05
 
 # Run MCMC
 set.seed(4300)
-num.iter <- 50000
+num.iter <- 500 # 50000 will take about 30 min on my system
+ptm <- proc.time()
 mcmc <- mcmc.iterative(num.iter, sigma0 =  0.2, tau0 = runif(T))
+print(proc.time() - ptm)
+
 plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
