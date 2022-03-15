@@ -4,12 +4,11 @@ library(INLA)
 load("rain.rda")
 
 control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
-
+ptm <- proc.time() # To calculate computation time
 mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
-summary(mod)
-
+(proc.time() - ptm)[3] # Computation time
 
 #Run inla.doc("rw1") for documentation provided by INLA on its built-in RW(1) model
 inla.doc("rw1")
