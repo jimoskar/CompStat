@@ -2,10 +2,13 @@
 
 library(INLA)
 load("rain.rda")
-
+alpha <- 2
+beta <- 0.05
+  
+  
 control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
 ptm <- proc.time() # To calculate computation time
-mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
+mod <- inla(n.rain ~ -1 + f(day, model="rw1", hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), constr=FALSE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 (proc.time() - ptm)[3] # Computation time
@@ -13,6 +16,7 @@ mod <- inla(n.rain ~ -1 + f(day, model="rw1", constr=FALSE),
 mod$summary.random
 
 plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+plot(inla.smarginal(mod$marginals.hyperpar$`Precision for day`), type = "l")
   
 plot(inla.smarginal(m))
 

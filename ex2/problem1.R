@@ -14,6 +14,11 @@ n <- rep(39, T) # n in binom. distr.
 n[60] = 10 # corrigate for feb 29th
 y <- rain$n.rain # response
 
+# logit function
+logit <- function(x){
+  return(x/(1 - x))
+}
+
 # Sigmoid function
 sigm <- function(tau){
   return(exp(tau)/(1 + exp(tau)))
@@ -35,9 +40,6 @@ rigamma <- function(n, a, b){
 calc.alpha <- function(t, tau.prop, tau.old){
   log.frac <- y[t]*(log.sigm(tau.prop) - log.sigm(tau.old)) + 
                       (n[t] - y[t])*(log.1m.sigm(tau.prop) - log.1m.sigm(tau.old))
-  if(t == 60){
-    log.frac = 0
-  }
   return(exp(log.frac))
 }
 
@@ -55,6 +57,7 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
   count <- 0 # Count of accepted tau-samples
   
   for(i in 2:num.iter){
+    # tau.mat[i, ] = tau.mat[i - 1, ]
     # Sample tau
     for(j in 1:T){
       # Generate proposal
@@ -68,18 +71,20 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       
       # Calculate acceptance prob.
       alpha <- min(1, calc.alpha(j, tau.prop, tau.mat[i - 1, j]))
+      print(alpha)
       u <- runif(1)
       if(u < alpha){
         tau.mat[i, j] = tau.prop
         count <- count + 1
       } else{
-        tau.mat[i, j] = tau.mat[i-1, j]
+        tau.mat[i, j] = tau.mat[i - 1, j]
       }
     }
     # Generate Gibbs sample for sigma
-    shape <- alpha + T/2
+    shape <- alpha + (T-1)/2
     scale <- 0.5*t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
-    sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
+    #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
+    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count))
 }
@@ -97,9 +102,9 @@ mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = runif(T))
 
 # Some plotting
 plot(1:num.iter, mcmc$sigma.vec, type = "l")
-plot(1:num.iter, mcmc$tau.mat[,300], type = "l")
-hist(mcmc$tau.mat[,366], breaks = 100, freq = FALSE, add = TRUE)
-hist(mcmc$sigma.vec, breaks = 100, freq = FALSE)
+plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
+hist(mcmc$tau.mat[,1], breaks = 100, freq = FALSE)
+hist(tail(1/mcmc$sigma.vec, 40000), breaks = 100, freq = FALSE)
 
 
 mcmc.df <- data.frame(x = 1:num.iter, tau1 = mcmc$tau.mat[, 1],
@@ -110,9 +115,10 @@ ggplot(mcmc.df) +
 ggplot(mcmc.df) + 
   geom_line(aes(x = x, y = sigma)) + theme_minimal()
 
-mcmc.1k <- mcmc.iterative(1000, sigma0 =  0.02, tau0 = runif(T))
+mcmc.1k <- mcmc.iterative(5000, sigma0 =  0.02, tau0 = logit(runif(T)))
 plot(501:1000, tail(mcmc.1k$sigma.vec, 500), type = "l")
-hist(tail(mcmc.1k$sigma.vec, 500), breaks = 20)
+plot(tail(mcmc.1k$tau.mat[,366], 4000), type = "l")
+hist(tail(sqrt(1/mcmc.1k$sigma.vec), 500), breaks = 20)
 mcmc.1k$sigma.vec
 
 # Martin's code
