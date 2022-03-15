@@ -46,6 +46,11 @@ calc.alpha <- function(t, tau.prop, tau.old){
   return(exp(log.frac))
 }
 
+acc.prob <- function(t, tau.prop, tau.old){
+  log.frac <- y[t]*(log(exp(-tau.old) + 1) - log(exp(-tau.prop) + 1)) + (n[t] - y[t])*(log(exp(tau.old) + 1) - log(exp(tau.prop) + 1))
+  return(min(1, exp(log.frac)))
+}
+
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
@@ -58,23 +63,20 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
   sigma.vec <- rep(NA, num.iter)
   sigma.vec[1] <- sigma0
   count <- 0 # Count of accepted tau-samples
+  alpha.vec <- rep(NA, num.iter - 1)
   
   for(i in 2:num.iter){
     # tau.mat[i, ] = tau.mat[i - 1, ]
     # Sample tau
     for(j in 1:T){
       # Generate proposal
-      Q.AA <- 1/sigma.vec[i-1] * Q[j,j]
-      Q.AB <- 1/sigma.vec[i-1] * Q[j, ]
-      Q.AB <- Q.AB[1:T != j]
-      
-      mu.AgB <- -1/Q.AA * Q.AB %*% (tau.mat[i - 1, 1:T != j])
-      Q.AgB <- Q.AA
-      tau.prop <- rnorm(1, as.numeric(mu.AgB), solve(Q.AgB))
+      mu.cond <- -1/Q[j,j] * Q[j, 1:T != j]%*% (tau.mat[i - 1, 1:T != j])
+      Q.cond <-  1/sigma.vec[i-1] * Q[j,j]
+      tau.prop <- rnorm(1, mu.cond, 1/Q.cond)
       
       # Calculate acceptance prob.
-      alpha <- min(1, calc.alpha(j, tau.prop, tau.mat[i - 1, j]))
-      print(alpha)
+      alpha <- acc.prob(j, tau.prop, tau.mat[i - 1, j])
+      alpha.vec[i-1] <- alpha
       u <- runif(1)
       if(u < alpha){
         tau.mat[i, j] = tau.prop
@@ -85,16 +87,25 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
     }
     # Generate Gibbs sample for sigma
     shape <- alpha + (T-1)/2
-    scale <- 0.5*t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
+    scale <- 0.5 * t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
     #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
-  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count))
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
 
 # Parameters for sigma prior
 alpha <- 2
 beta <- 0.05
+
+# testing
+
+mcmc.1k <- mcmc.iterative(10000, sigma0 =  0.02, tau0 = logit(runif(T)))
+mean(mcmc.1k$alpha)
+plot(tail(mcmc.1k$sigma.vec, 9000), type = "l")
+plot(tail(mcmc.1k$tau.mat[,201], 9000), type = "l")
+hist(tail(sqrt(1/mcmc.1k$sigma.vec), 500), breaks = 20)
+mcmc.1k$sigma.vec
 
 # Run MCMC
 set.seed(4300)
@@ -118,11 +129,7 @@ ggplot(mcmc.df) +
 ggplot(mcmc.df) + 
   geom_line(aes(x = x, y = sigma)) + theme_minimal()
 
-mcmc.1k <- mcmc.iterative(5000, sigma0 =  0.02, tau0 = logit(runif(T)))
-plot(501:1000, tail(mcmc.1k$sigma.vec, 500), type = "l")
-plot(tail(mcmc.1k$tau.mat[,366], 4000), type = "l")
-hist(tail(sqrt(1/mcmc.1k$sigma.vec), 500), breaks = 20)
-mcmc.1k$sigma.vec
+
 
 
 
@@ -236,12 +243,12 @@ sigma2.0 <- 0.2
 
 # test the MCMC algorithm
 time <- proc.time()
-run <- MCMCMC(1000, tau.0, sigma2.0)
+run <- MCMCMC(10000, tau.0, sigma2.0)
 print(proc.time()-time)
 
+hist(tail(1/run$sigma2, 500), freq = FALSE)
+plot(run$tau[201,], type = 'l')
 
-plot(run$sigma, type = 'l')
 
-
-
+length(run$tau[, 1])
 
