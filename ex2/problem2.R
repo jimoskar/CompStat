@@ -5,17 +5,19 @@ load("rain.rda")
 alpha <- 2
 beta <- 0.05
   
-  
+## a) ----
 control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
 ptm <- proc.time() # To calculate computation time
-mod <- inla(n.rain ~ -1 + f(day, model="rw1", hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), constr=FALSE),
+mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
+                            hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
+                            constr=FALSE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 (proc.time() - ptm)[3] # Computation time
 
 mod$summary.random
 
-plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+plot(inla.smarginal(mod$marginals.random$day$index.201), type = "l")
 plot(inla.smarginal(mod$marginals.hyperpar$`Precision for day`), type = "l")
   
 plot(inla.smarginal(m))
@@ -23,19 +25,33 @@ plot(inla.smarginal(m))
 #Run inla.doc("rw1") for documentation provided by INLA on its built-in RW(1) model
 inla.doc("rw1")
 
-
-## a) ----
-
-
 ## b) ----
+?control.inla
+strategy = c('gaussian', 'simplified.laplace', 'laplace', 'adaptive')
+int.strategy = c('ccd', 'grid', 'eb', 'user', 'user.std')
+controls <- expand.grid(strategy, int.strategy)
+control.inla = list(strategy="simplified.laplace", int.strategy="eb")
+control.inla = list(strategy=paste(controls[1,1]), int.strategy=paste(controls[1,2]))
+mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
+                            hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
+                            constr=FALSE),
+            data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
+            family="binomial", verbose=TRUE, control.inla=control.inla)
+plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
+# for loop for every comb.
 
 
 ## c) ----
 
 # We consider the following model in INLA:
-mod <- inla(n.rain ~ f(day, model="rw1", constr=TRUE),
+mod2 <- inla(n.rain ~ f(day, model="rw1", 
+                        hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))),
+                        constr=TRUE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 
-summary(mod)
-
+mod2$summary.random$day
+lines()
+plot(inla.smarginal(mod2$marginals.random$day$index.366), type = "l")
+lines(inla.smarginal(mod$marginals.random$day$index.366), type = "l")

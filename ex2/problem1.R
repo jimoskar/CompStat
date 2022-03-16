@@ -51,6 +51,11 @@ acc.prob <- function(t, tau.prop, tau.old){
   return(min(1, exp(log.frac)))
 }
 
+alpha.c <- function(t, tau.prop, tau.old){
+  right <- y[t]*(tau.prop - tau.old) + n[t]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
+  return(min(1, exp(right)))
+}
+
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
@@ -72,10 +77,10 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       # Generate proposal
       mu.cond <- -1/Q[j,j] * Q[j, 1:T != j]%*% (tau.mat[i - 1, 1:T != j])
       Q.cond <-  1/sigma.vec[i-1] * Q[j,j]
-      tau.prop <- rnorm(1, mu.cond, 1/Q.cond)
+      tau.prop <- rnorm(1, mu.cond, sqrt(1/Q.cond))
       
       # Calculate acceptance prob.
-      alpha <- acc.prob(j, tau.prop, tau.mat[i - 1, j])
+      alpha <- alpha.c(j, tau.prop, tau.mat[i - 1, j])
       alpha.vec[i-1] <- alpha
       u <- runif(1)
       if(u < alpha){
@@ -86,8 +91,9 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       }
     }
     # Generate Gibbs sample for sigma
+    tQt <- sum((head(tau.mat[i, ], -1) - tail(tau.mat[i, ], -1))^2)
     shape <- alpha + (T-1)/2
-    scale <- 0.5 * t(tau.mat[i, ]) %*% Q %*% tau.mat[i, ] + beta
+    scale <- 0.5*tQt + beta
     #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
@@ -100,11 +106,12 @@ beta <- 0.05
 
 # testing
 
-mcmc.1k <- mcmc.iterative(10000, sigma0 =  0.02, tau0 = logit(runif(T)))
+mcmc.1k <- mcmc.iterative(50000, sigma0 =  0.02, tau0 = rnorm(T))
 mean(mcmc.1k$alpha)
-plot(tail(mcmc.1k$sigma.vec, 9000), type = "l")
-plot(tail(mcmc.1k$tau.mat[,201], 9000), type = "l")
-hist(tail(sqrt(1/mcmc.1k$sigma.vec), 500), breaks = 20)
+plot(tail(mcmc.1k$sigma.vec, 50000), type = "l")
+plot(tail(mcmc.1k$tau.mat[,201], 50000), type = "l")
+hist(tail(1/mcmc.1k$sigma.vec, 9000), breaks = 50)
+hist(tail(mcmc.1k$tau.mat[,201],40000), freq = FALSE, breaks = 100, add = TRUE)
 mcmc.1k$sigma.vec
 
 # Run MCMC
