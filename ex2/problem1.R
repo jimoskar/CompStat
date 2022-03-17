@@ -141,7 +141,7 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       }
     }
     # Generate Gibbs sample for sigma
-    tQt <- sum((head(tau.mat[i, ], -1) - tail(tau.mat[i, ], -1))^2)
+    tQt <- sum(diff(tau.mat[i, ])^2)
     shape <- alpha + (T-1)/2
     scale <- 0.5*tQt + beta
     #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
@@ -167,6 +167,7 @@ mcmc$count/((50000) * 366)
 # Plot predictions of pi
 plot.preds(mcmc$tau.mat)
 
+
 # Calculate statistics for 1, 201, 366 and sigma
 idx <- c(1, 201, 366)
 pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
@@ -177,11 +178,105 @@ tau.table
 mean(mcmc$sigma.vec)
 quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 
+## f) ----
+
+alpha.c <- function(t, tau.prop, tau.old){
+  right <- y[t]*(tau.prop - tau.old) + n[t]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
+  return(min(1, exp(right)))
+}
 
 
+alpha.c.block <- function(I, tau.prop, tau.old){
+  right <- y[I]*(tau.prop - tau.old) + n[I]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
+  
+  min(1, exp(sum(right)))
+}
+
+mcmc.block <- function(num.iter, sigma0, tau0, M){
+  # blocking is now possible
+  if(M==1){
+    return( mcmc.iterative(num.iter, sigma0, tau0) )
+  }
+  ## Initialising
+  tau.mat <- matrix(NA, nrow = num.iter, ncol = T)
+  tau.mat[1, ] <- tau0
+  sigma.vec <- rep(NA, num.iter)
+  sigma.vec[1] <- sigma0
+  count <- 0 # Count of accepted tau-samples
+  alpha.vec <- rep(NA, num.iter - 1)
+  
+  ## Precomputing, (assuming M<T)
+  n.block.total <- ceiling(T/M)
+  n.blocks <- list(1, ceiling(T/M)-2, 1)
+  M.3 <- T-(ceiling(T/M)-1)*M
+  # Q.AA for the three different blocks
+  Q.AA <- list( Q[1:M, 1:M], Q[2:(M+1), 2:(M+1)], Q[(T-M.3+1):T, (T-M.3+1):T] )
+  # Inverse of Q.AA for all blocks
+  Q.AA.inv <- list( solve(Q.AA[[1]]) )
+  if(n.blocks[[2]] > 0){
+    Q.AA.inv2 <- solve(Q.AA[[2]])
+    for(n in 1:n.blocks[[2]]){
+      Q.AA.inv <- append( Q.AA.inv, list(Q.AA.inv2) )
+    }  
+  } 
+  Q.AA.inv <- append( Q.AA.inv, list(solve(Q.AA[[3]])) )
+  # Q.AB for all blocks
+  Q.AB <- list(Q[1:M, (M+1):T])
+  if(n.blocks[[2]] > 0){
+    for(n in 1:n.blocks[[2]]){
+      I <- (M*n + 1):(M*(n+1))
+      Q.AB <- append( Q.AB, list(Q[I, (1:T)[-I]]) )
+    }   
+  }
+  Q.AB <- append( Q.AB, list(Q[(T-M.3+1):T, 1:(T-M.3)]) )
+  # inv(Q.AA) * Q.AB
+  S <- list()
+  for(n in 1:n.block.total){
+    S <- append( S, list(Q.AA.inv[[n]] %*% Q.AB[[n]]) )
+  }
+  
+  for(i in 2:num.iter){
+    # Sample tau
+    
+    idx.block <- 0
+    for(j in seq(1,T,M)){
+      # Indecies
+      idx.block <- idx.block + 1
+      a <- j
+      b <- min(j+M-1, T)
+      I = a:b
+      
+      # Generate proposal
+      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i-1, (1:T)[-I]], ncol=1)
+      Q.cond.inv <-  sigma.vec[i-1] * Q.AA.inv[[idx.block]]
+      tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
+      
+      # Calculate acceptance prob.
+      accept.prob <- alpha.c.block(I, tau.prop, tau.mat[i - 1, I])
+      alpha.vec[i-1] <- accept.prob
+      
+      u <- runif(1)
+      if(u < accept.prob){
+        tau.mat[i, I] = tau.prop
+        count <- count + 1
+      } else{
+        tau.mat[i, I] = tau.mat[i - 1, I]
+      }
+    }
+    # Generate Gibbs sample for sigma
+    tQt <- sum(diff(tau.mat[i, ])^2)
+    shape <- alpha + (T-1)/2
+    scale <- 0.5*tQt + beta
+    #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
+    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
+  }
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
+}
 
 
+run <- mcmc.block(1000, sigma0 =  0.02, tau0 = rnorm(T), M=5)
 
+plot(run$tau.mat[,1], type='l')
 
 
 # Martin's code
@@ -192,33 +287,15 @@ load("rain.rda")
 # sample autocorrelation
 source('sacf.R')
 
-T <- 366
-n <- rep(39, T)
-n[60] = 10
-alpha <- 2
-beta <- 0.05
-
-# response
-y <- rain$n.rain
-# Construct Q (without the 1/sigma2 factor)
-Q <- diag(rep(2, T))
-Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
-Q[1,1] <- Q[T,T] <- 1
-
-num.iter <- 500 # 50000 will take about 30 min on my system
-
-
 # "expit"/"sigmoid" function
 expit <- function(x){
   1/(exp(-x)+1)
 }
 
-
 # Negative logarithmic "expit"
 neg.log.expit <- function(x){
   log(exp(-x)+1)
 }
-
 
 # Function to sample from inverse gamma
 rigamma <- function(n, shape, scale){
@@ -226,15 +303,25 @@ rigamma <- function(n, shape, scale){
   return(1/rgamma(n, shape = shape, rate = 1/scale))
 }
 
-tau.accept <- function(t, tau.prop, tau.curr){
+tau.accept <- function(t, tau.prop, tau.curr, y, n){
   log.acc <- y[t] * ( neg.log.expit(tau.curr) - neg.log.expit(tau.prop) ) +
       (y[t] - n[t]) * ( neg.log.expit(-tau.curr) - neg.log.expit(-tau.prop) )
+  
+  min(1, exp(log.acc))
+}
+
+tau.accept.block <- function(I, tau.prop, tau.curr){
+  log.acc <- 0
+  for(t in I){
+    log.acc <- log.acc + y[t] * ( neg.log.expit(tau.curr) - neg.log.expit(tau.prop) ) +
+      (y[t] - n[t]) * ( neg.log.expit(-tau.curr) - neg.log.expit(-tau.prop) )
+  }
   
   exp(log.acc)
 }
 
 
-MCMCMC <- function(n.iter, tau, sigma2){
+MCMCMC <- function(n.iter, tau, sigma2, Q, y, n){
   # length of tau
   T <- length(tau)
   
@@ -254,23 +341,30 @@ MCMCMC <- function(n.iter, tau, sigma2){
       # tau.A conditioned on tau.B
       mu.cond <- -1/Q.AA * Q.AB %*% tau.mat[mt, i]
       Q.cond <- Q.AA
+      #print(paste("mu: ", mu.cond))
+      #print(paste("Q: ", Q.cond))
       
       # Generate proposal
-      tau.proposal <- rnorm(1, as.numeric(mu.cond), sigma2.vec[i]/Q.cond)
+      tau.proposal <- rnorm(1, mean = mu.cond, sd = sqrt(sigma2.vec[i]/Q.cond))
+      
+      #print('Iteration:')
+      #print(tau.mat[t,i])
+      #print(tau.proposal)
       
       # Calculate acceptance probability
-      alpha <- tau.accept(t, tau.proposal, tau.mat[t,i])
+      acc <- tau.accept(t, tau.proposal, tau.mat[t,i], y, n)
+      if(is.na(acc)){browser()}
+      #print(acc)
       
       # Draw from uniform distribution
       u <- runif(1)
-      if(u < alpha){
+      if(u < acc){
         tau.mat[t, i+1] = tau.proposal
       } else{
         tau.mat[t, i+1] = tau.mat[t, i]
       }
     }
     # Gibbs step for sigma2
-    
     shape <- alpha + (T-1)/2
     scale <- 0.5*t(tau.mat[,i]) %*% Q %*% tau.mat[, i] + beta
     sigma2.vec[i+1] <- rigamma(1, shape = shape, scale = scale)
@@ -279,19 +373,43 @@ MCMCMC <- function(n.iter, tau, sigma2){
   list("tau" = tau.mat, "sigma2" = sigma2.vec)
 }
 
-# set some initial values
-tau.0 <- runif(366, min=-3, max=0)
-pi.0 <- expit(tau.0)
-sigma2.0 <- 0.2
 
-# test the MCMC algorithm
-time <- proc.time()
-run <- MCMCMC(10000, tau.0, sigma2.0)
-print(proc.time()-time)
+# Test if the acceptance rate is wrong.
+do.iterations <- function(n.iter = 50000){
+  T <- 366
+  n <- rep(39, T)
+  n[60] = 10
+  #y = rain$n.rain
+  y <- rain$n.rain
+  
+  alpha <- 2
+  beta <- 0.05
+  
+  # Construct Q (without the 1/sigma2 factor)
+  Q <- diag(rep(2, T))
+  Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
+  Q[1,1] <- Q[T,T] <- 1
+  
+  # initial values
+  tau.0 <- runif(366, min=-3, max=0)
+  sigma2.0 <- 0.2
+  
+  # do the MCMC calculations
+  time <- proc.time()
+  run <- MCMCMC(n.iter, tau.0, sigma2.0, Q, y, n)
+  print(proc.time()-time)
+  
+  run
+}
 
-hist(tail(1/run$sigma2, 500), freq = FALSE)
-plot(run$tau[201,], type = 'l')
+run <- do.iterations(n.iter=2)
+
+hist(tail(run$sigma2, 100), freq = FALSE)
+plot(run$tau[100,], type = 'l')
 
 
-length(run$tau[, 1])
+
+
+
+
 
