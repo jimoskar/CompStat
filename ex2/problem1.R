@@ -108,7 +108,7 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
 
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
-Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
+Q[abs(row(Q) - col(Q)) == 1] <- -1
 Q[1,1] <- Q[T,T] <- 1
 
 # MCMC with iterative conditioning
@@ -171,10 +171,11 @@ plot.preds(mcmc$tau.mat)
 # Calculate statistics for 1, 201, 366 and sigma
 idx <- c(1, 201, 366)
 pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
-tau.table <- data.frame(idx = idx, pi = pi.df$pi[idx], 
+table <- data.frame(idx = idx, pi = pi.df$pi[idx], 
                   lower = pi.df$lower[idx], upper = pi.df$upper[idx])
-tau.table
-
+# Create table for taus
+xtable(table, digits = 4)
+# Add in values for sigma by hand
 mean(mcmc$sigma.vec)
 quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 
