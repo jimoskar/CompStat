@@ -71,6 +71,7 @@ CI <- function(samples, burn = 0, alpha = 0.05, by = 1000){
   return(ci.mat)
 }
 
+# maybe useless function
 plot.pi <- function(t, samples, burn = 0, alpha = 0.05, ci.by = 1000){
   pi <- y[t]/n[t]
   pi.samples <- sigm(samples)
@@ -81,12 +82,29 @@ plot.pi <- function(t, samples, burn = 0, alpha = 0.05, ci.by = 1000){
   lines(CI$idx, CI$upper, col = "red")
   lines(CI$idx, CI$lower, col = "red")
   abline(a = pi, b = 0, col = "blue")
-  
-  # par(mfrow = c(2, 1))
-  # plot(1:length(samples), tau.mean, type = "l", ylim = c(-2, 2))
-  # lines(CI$idx, CI$upper, col = "red")
-  # lines(CI$idx, CI$lower, col = "red")
 }
+
+# Function for plotting mcmc preds or making dataset. should maybe split up
+plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
+  tau.mat <- tau.mat[burn:nrow(tau.mat), ]
+  tau.mean <- apply(tau.mat, 2, mean)
+  lower <- apply(tau.mat, 2, quantile, probs = c(alpha/2))
+  upper <- apply(tau.mat, 2, quantile, probs = c(1 - alpha/2))
+  pi.mcmc <- sigm(tau.mean)
+  gg.df <- data.frame(x = 1:T, p = y/n, pi = pi.mcmc, 
+                      lower = sigm(lower), upper = sigm(upper))
+  if(plot){
+    ggplot(gg.df, aes(x = x)) + geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+      geom_line(aes(y = pi, color = "pi")) +
+      geom_line(aes(y = p, color = "yt/nt"), alpha = 0.1) +
+      xlab("Day in year, t") + ylab(expression(pi)) +
+      scale_color_manual(name = " ", values = c("yt/nt" = "blue", "MCMC-predictions" = "black")) +
+      theme_minimal()
+  } else{
+    return(gg.df)
+  }
+}
+
 
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
@@ -136,50 +154,28 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
 alpha <- 2
 beta <- 0.05
 
-# testing
-mcmc.1k <- mcmc.iterative(50000, sigma0 =  0.02, tau0 = rnorm(T))
-mean(mcmc.1k$alpha)
-plot(tail(mcmc.1k$sigma.vec, 50000), type = "l")
-plot(tail(mcmc.1k$tau.mat[,201], 50000), type = "l")
-hist(tail(1/mcmc.1k$sigma.vec, 9000), breaks = 50)
-hist(tail(mcmc.1k$tau.mat[,201],40000), freq = FALSE, breaks = 100, add = TRUE)
-mcmc.1k$sigma.vec
-plot(sigm(mcmc.1k$tau.mat[,1]), type = "l")
-abline( a = y[1]/n[1], b = 0, col = "red")
-
-CI(mcmc.1k$tau.mat[,1], burn = 0)
-plot.pi(1, mcmc.1k$tau.mat[,5])
-
-
 # Run MCMC
 set.seed(4300)
 num.iter <- 50000
 ptm <- proc.time() # For computation time
-mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = runif(T))
+mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
 (proc.time() - ptm)[3] # Computation time of MCMC
 
+# Calculate acceptance rate
+mcmc$count/((50000) * 366)
 
-# Some plotting
-plot(1:num.iter, mcmc$sigma.vec, type = "l")
-plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
-hist(mcmc$tau.mat[,1], breaks = 100, freq = FALSE)
-hist(tail(1/mcmc$sigma.vec, 40000), breaks = 100, freq = FALSE)
+# Plot predictions of pi
+plot.preds(mcmc$tau.mat)
 
+# Calculate statistics for 1, 201, 366 and sigma
+idx <- c(1, 201, 366)
+pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
+tau.table <- data.frame(idx = idx, pi = pi.df$pi[idx], 
+                  lower = pi.df$lower[idx], upper = pi.df$upper[idx])
+tau.table
 
-
-
-mcmc.df <- data.frame(x = 1:num.iter, tau1 = mcmc$tau.mat[, 1],
-                      tau201 = mcmc$tau.mat[, 201], tau366 = mcmc$tau.mat[, 366], sigma = mcmc$sigma.vec)
-# Trace plots
-ggplot(mcmc.df) + 
-  geom_line(aes(x = x, y = tau1)) + theme_minimal()
-ggplot(mcmc.df) + 
-  geom_line(aes(x = x, y = sigma)) + theme_minimal()
-
-
-
-
-
+mean(mcmc$sigma.vec)
+quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 
 
 
