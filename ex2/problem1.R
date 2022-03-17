@@ -22,18 +22,6 @@ logit <- function(x){
 sigm <- function(tau){
   return(exp(tau)/(1 + exp(tau)))
 }
-log.sigm <- function(tau){
-  return(-log(exp(-tau) + 1))
-}
-log.1m.sigm <- function(tau){
-  return(-log(exp(tau) + 1))
-}
-
-# Function to sample from inverse gamma
-rigamma <- function(n, a, b){
-  # Uses shape and scale
-  return(1/rgamma(n, shape = a, rate = 1/b))
-}
 
 # Function to calculate acceptance probability, works for single and multiple indecies I
 acceptance.probability <- function(I, tau.proposal, tau.current){
@@ -132,9 +120,10 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
     #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
-  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
+  return(list(tau.mat = tau.mat, 
+              sigma.vec = sigma.vec, 
+              count = count))
 }
-
 
 problem.e <- function(){
   # Parameters
@@ -180,18 +169,6 @@ problem.e <- function(){
   mean(mcmc$sigma.vec)
   quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 }
-
-
-# Calculate statistics for 1, 201, 366 and sigma
-idx <- c(1, 201, 366)
-pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
-table <- data.frame(idx = idx, pi = pi.df$pi[idx], 
-                  lower = pi.df$lower[idx], upper = pi.df$upper[idx])
-# Create table for taus
-xtable(table, digits = 4)
-# Add in values for sigma by hand
-mean(mcmc$sigma.vec)
-quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 
 
 ## f) ----
@@ -258,7 +235,6 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
       
       # Calculate acceptance prob.
       accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
-      alpha.vec[i-1] <- accept.prob
       
       u <- runif(1)
       if(u < accept.prob){
@@ -274,7 +250,7 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
     scale <- 0.5*tQt + beta
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
-  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count))
 }
 
 
