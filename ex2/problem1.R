@@ -12,10 +12,6 @@ ggplot(rain, aes(x = day, y = n.rain)) +
   theme_minimal()
 
 ## e) ----
-T <- 366 # days in a year
-n <- rep(39, T) # n in binom. distr.
-n[60] = 10 # corrigate for feb 29th
-y <- rain$n.rain # response
 
 # logit function
 logit <- function(x){
@@ -39,21 +35,11 @@ rigamma <- function(n, a, b){
   return(1/rgamma(n, shape = a, rate = 1/b))
 }
 
-# Function to calculate right part of accept. prob.
-calc.alpha <- function(t, tau.prop, tau.old){
-  log.frac <- y[t]*(log.sigm(tau.prop) - log.sigm(tau.old)) + 
-                      (n[t] - y[t])*(log.1m.sigm(tau.prop) - log.1m.sigm(tau.old))
-  return(exp(log.frac))
-}
-
-acc.prob <- function(t, tau.prop, tau.old){
-  log.frac <- y[t]*(log(exp(-tau.old) + 1) - log(exp(-tau.prop) + 1)) + (n[t] - y[t])*(log(exp(tau.old) + 1) - log(exp(tau.prop) + 1))
-  return(min(1, exp(log.frac)))
-}
-
-alpha.c <- function(t, tau.prop, tau.old){
-  right <- y[t]*(tau.prop - tau.old) + n[t]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
-  return(min(1, exp(right)))
+# Function to calculate acceptance probability, works for single and multiple indecies I
+acceptance.probability <- function(I, tau.proposal, tau.current){
+  log.acc <- y[I]*(tau.proposal - tau.current) +
+    n[I]*log((1 + exp(tau.current))/(1 + exp(tau.proposal)))
+  return(min(1, exp(log.acc)))
 }
 
 # Function for calculating 100(1-alpha) credible intervals
@@ -105,12 +91,6 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   }
 }
 
-
-# Construct Q without the 1/sigma factor
-Q <- diag(rep(2, T))
-Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
-Q[1,1] <- Q[T,T] <- 1
-
 # MCMC with iterative conditioning
 mcmc.iterative <- function(num.iter, sigma0, tau0){
   tau.mat <- matrix(NA, nrow = num.iter, ncol = T)
@@ -130,7 +110,7 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       tau.prop <- rnorm(1, mu.cond, sqrt(1/Q.cond))
       
       # Calculate acceptance prob.
-      accept.prob <- alpha.c(j, tau.prop, tau.mat[i - 1, j])
+      accept.prob <- acceptance.probability(j, tau.prop, tau.mat[i - 1, j])
       alpha.vec[i-1] <- accept.prob
       u <- runif(1)
       if(u < accept.prob){
@@ -150,50 +130,58 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
 
-# Parameters for sigma prior
-alpha <- 2
-beta <- 0.05
 
-# Run MCMC
-set.seed(4300)
-num.iter <- 50000
-ptm <- proc.time() # For computation time
-mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
-(proc.time() - ptm)[3] # Computation time of MCMC
+problem.e <- function(){
+  # Parameters
+  T <- 366          # days in a year
+  n <- rep(39, T)   # n in binomial distribution
+  n[60] = 10        # corrigate for feb 29th
+  y <- rain$n.rain  # response
+  
+  # Construct Q without the 1/sigma factor
+  Q <- diag(rep(2, T))
+  Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
+  Q[1,1] <- Q[T,T] <- 1
+  
+  # Parameters for sigma prior
+  alpha <- 2
+  beta <- 0.05
+  
+  # Run MCMC
+  num.iter <- 5000
+  set.seed(4300)
+  ptm <- proc.time()
+  mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
+  elapsed.time <- (proc.time() - ptm)[3]
+  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
+  
+  # Calculate acceptance rate
+  acceptance.rate <- mcmc$count/(num.iter * T)
+  print(paste("The acceptance rate is", round(acceptance.rate,8) ))
+  
+  # Plot predictions of pi
+  plot.preds(mcmc$tau.mat)
+  
+  # Calculate statistics for 1, 201, 366 and sigma
+  tau.idx <- c(1, 201, 366)
+  pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
+  
+  tau.table <- data.frame(idx = tau.idx,
+                          pi = pi.df$pi[tau.idx], 
+                          lower = pi.df$lower[tau.idx],
+                          upper = pi.df$upper[tau.idx])
+  tau.table
+  
+  mean(mcmc$sigma.vec)
+  quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+}
 
-# Calculate acceptance rate
-mcmc$count/((50000) * 366)
 
-# Plot predictions of pi
-plot.preds(mcmc$tau.mat)
-
-
-# Calculate statistics for 1, 201, 366 and sigma
-idx <- c(1, 201, 366)
-pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
-tau.table <- data.frame(idx = idx, pi = pi.df$pi[idx], 
-                  lower = pi.df$lower[idx], upper = pi.df$upper[idx])
-tau.table
-
-mean(mcmc$sigma.vec)
-quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 
 ## f) ----
 
-alpha.c <- function(t, tau.prop, tau.old){
-  right <- y[t]*(tau.prop - tau.old) + n[t]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
-  return(min(1, exp(right)))
-}
-
-
-alpha.c.block <- function(I, tau.prop, tau.old){
-  right <- y[I]*(tau.prop - tau.old) + n[I]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
-  
-  min(1, exp(sum(right)))
-}
-
 mcmc.block <- function(num.iter, sigma0, tau0, M){
-  # blocking is now possible
+  # Blocking is now possible for M>1
   if(M==1){
     return( mcmc.iterative(num.iter, sigma0, tau0) )
   }
@@ -204,6 +192,7 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
   sigma.vec[1] <- sigma0
   count <- 0 # Count of accepted tau-samples
   alpha.vec <- rep(NA, num.iter - 1)
+  
   
   ## Precomputing, (assuming M<T)
   n.block.total <- ceiling(T/M)
@@ -235,9 +224,9 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
     S <- append( S, list(Q.AA.inv[[n]] %*% Q.AB[[n]]) )
   }
   
+  
   for(i in 2:num.iter){
-    # Sample tau
-    
+    # MH samples for tau
     idx.block <- 0
     for(j in seq(1,T,M)){
       # Indecies
@@ -252,7 +241,7 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
       tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
       
       # Calculate acceptance prob.
-      accept.prob <- alpha.c.block(I, tau.prop, tau.mat[i - 1, I])
+      accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
       alpha.vec[i-1] <- accept.prob
       
       u <- runif(1)
@@ -267,19 +256,70 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
     tQt <- sum(diff(tau.mat[i, ])^2)
     shape <- alpha + (T-1)/2
     scale <- 0.5*tQt + beta
-    #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
 
 
-run <- mcmc.block(1000, sigma0 =  0.02, tau0 = rnorm(T), M=5)
+problem.f <- function(){
+  # Parameters
+  T <- 366          # days in a year
+  n <- rep(39, T)   # n in binomial distribution
+  n[60] = 10        # corrigate for feb 29th
+  y <- rain$n.rain  # response
+  
+  # Construct Q without the 1/sigma factor
+  Q <- diag(rep(2, T))
+  Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
+  Q[1,1] <- Q[T,T] <- 1
+  
+  # Parameters for sigma prior
+  alpha <- 2
+  beta <- 0.05
+  
+  # Blocking interval
+  M <- 10
+  
+  # Run MCMC
+  num.iter <- 5000
+  set.seed(4300)
+  ptm <- proc.time()
+  mcmc <- mcmc.block(num.iter, sigma0 =  0.02, tau0 = rnorm(T), M)
+  elapsed.time <- (proc.time() - ptm)[3]
+  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
+  
+  # Calculate acceptance rate
+  acceptance.rate <- mcmc$count/(num.iter * T)
+  print(paste("The acceptance rate is", round(acceptance.rate,8) ))
+  
+  # Plot predictions of pi
+  plot.preds(mcmc$tau.mat)
+  
+  # Calculate statistics for 1, 201, 366 and sigma
+  tau.idx <- c(1, 201, 366)
+  pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
+  
+  tau.table <- data.frame(idx = tau.idx,
+                          pi = pi.df$pi[tau.idx], 
+                          lower = pi.df$lower[tau.idx],
+                          upper = pi.df$upper[tau.idx])
+  tau.table
+  
+  mean(mcmc$sigma.vec)
+  quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+}
 
-plot(run$tau.mat[,1], type='l')
 
 
-# Martin's code
+
+
+
+
+
+
+
+# Martin's old code
 library(ggplot2)
 library(MASS)
 load("rain.rda")
@@ -406,8 +446,6 @@ run <- do.iterations(n.iter=2)
 
 hist(tail(run$sigma2, 100), freq = FALSE)
 plot(run$tau[100,], type = 'l')
-
-
 
 
 
