@@ -123,7 +123,7 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
       }
     }
     # Generate Gibbs sample for sigma
-    tQt <- sum((head(tau.mat[i, ], -1) - tail(tau.mat[i, ], -1))^2)
+    tQt <- sum(diff(tau.mat[i, ])^2)
     shape <- alpha + (T-1)/2
     scale <- 0.5*tQt + beta
     #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
@@ -137,7 +137,7 @@ alpha <- 2
 beta <- 0.05
 
 # testing
-mcmc.1k <- mcmc.iterative(50000, sigma0 =  0.02, tau0 = rnorm(T))
+mcmc.1k <- mcmc.iterative(500, sigma0 =  0.02, tau0 = rnorm(T))
 mean(mcmc.1k$alpha)
 plot(tail(mcmc.1k$sigma.vec, 50000), type = "l")
 plot(tail(mcmc.1k$tau.mat[,201], 50000), type = "l")
@@ -179,13 +179,104 @@ ggplot(mcmc.df) +
 
 
 
+## f) ----
+
+alpha.c <- function(t, tau.prop, tau.old){
+  right <- y[t]*(tau.prop - tau.old) + n[t]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
+  return(min(1, exp(right)))
+}
+
+alpha.c.block <- function(I, tau.prop, tau.old){
+  right <- y[I]*(tau.prop - tau.old) + n[I]*log((1 + exp(tau.old))/(1 + exp(tau.prop)))
+  
+  min(1, exp(sum(right)))
+}
+
+mcmc.block <- function(num.iter, sigma0, tau0, M){
+  # blocking is now possible
+  if(M==1){
+    return( mcmc.iterative(num.iter, sigma0, tau0) )
+  }
+  ## Initialising
+  tau.mat <- matrix(NA, nrow = num.iter, ncol = T)
+  tau.mat[1, ] <- tau0
+  sigma.vec <- rep(NA, num.iter)
+  sigma.vec[1] <- sigma0
+  count <- 0 # Count of accepted tau-samples
+  alpha.vec <- rep(NA, num.iter - 1)
+  
+  ## Precomputing, (assuming M<T)
+  n.block.total <- ceiling(T/M)
+  n.blocks <- list(1, ceiling(T/M)-2, 1)
+  M.3 <- T-(ceiling(T/M)-1)*M
+  # Q.AA for the three different blocks
+  Q.AA <- list( Q[1:M, 1:M], Q[2:(M+1), 2:(M+1)], Q[(T-M.3+1):T, (T-M.3+1):T] )
+  # Inverse of Q.AA for all blocks
+  Q.AA.inv <- list( solve(Q.AA[[1]]) )
+  if(n.blocks[[2]] > 0){
+    Q.AA.inv2 <- solve(Q.AA[[2]])
+    for(n in 1:n.blocks[[2]]){
+      Q.AA.inv <- append( Q.AA.inv, list(Q.AA.inv2) )
+    }  
+  } 
+  Q.AA.inv <- append( Q.AA.inv, list(solve(Q.AA[[3]])) )
+  # Q.AB for all blocks
+  Q.AB <- list(Q[1:M, (M+1):T])
+  if(n.blocks[[2]] > 0){
+    for(n in 1:n.blocks[[2]]){
+      I <- (M*n + 1):(M*(n+1))
+      Q.AB <- append( Q.AB, list(Q[I, (1:T)[-I]]) )
+    }   
+  }
+  Q.AB <- append( Q.AB, list(Q[(T-M.3+1):T, 1:(T-M.3)]) )
+  # inv(Q.AA) * Q.AB
+  S <- list()
+  for(n in 1:n.block.total){
+    S <- append( S, list(Q.AA.inv[[n]] %*% Q.AB[[n]]) )
+  }
+  
+  for(i in 2:num.iter){
+    # Sample tau
+    
+    idx.block <- 0
+    for(j in seq(1,T,M)){
+      # Indecies
+      idx.block <- idx.block + 1
+      a <- j
+      b <- min(j+M-1, T)
+      I = a:b
+      
+      # Generate proposal
+      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i-1, (1:T)[-I]], ncol=1)
+      Q.cond.inv <-  sigma.vec[i-1] * Q.AA.inv[[idx.block]]
+      tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
+      
+      # Calculate acceptance prob.
+      accept.prob <- alpha.c.block(I, tau.prop, tau.mat[i - 1, I])
+      alpha.vec[i-1] <- accept.prob
+      
+      u <- runif(1)
+      if(u < accept.prob){
+        tau.mat[i, I] = tau.prop
+        count <- count + 1
+      } else{
+        tau.mat[i, I] = tau.mat[i - 1, I]
+      }
+    }
+    # Generate Gibbs sample for sigma
+    tQt <- sum(diff(tau.mat[i, ])^2)
+    shape <- alpha + (T-1)/2
+    scale <- 0.5*tQt + beta
+    #sigma.vec[i] <- rinvgamma(1, shape = shape, scale = scale)
+    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
+  }
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
+}
 
 
+run <- mcmc.block(1000, sigma0 =  0.02, tau0 = rnorm(T), M=5)
 
-
-
-
-
+plot(run$tau.mat[,1], type='l')
 
 
 # Martin's code
