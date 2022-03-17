@@ -56,6 +56,38 @@ alpha.c <- function(t, tau.prop, tau.old){
   return(min(1, exp(right)))
 }
 
+# Function for calculating 100(1-alpha) credible intervals
+CI <- function(samples, burn = 0, alpha = 0.05, by = 1000){
+  samples <- tail(samples, length(samples) - burn) # Remove burn-in samples
+  
+  iter <- length(samples) %/% by
+  ci.mat <- data.frame(lower = rep(NA, iter), upper = rep(NA, iter), idx = rep(NA, iter))
+  for(i in 1:iter){
+    ci <- quantile(samples[1:(i*by)], probs = c(alpha/2, 1 - alpha/2))
+    ci.mat$lower[i] <- ci[1]
+    ci.mat$upper[i] <- ci[2]
+    ci.mat$idx[i] <- i*by
+  }
+  return(ci.mat)
+}
+
+plot.pi <- function(t, samples, burn = 0, alpha = 0.05, ci.by = 1000){
+  pi <- y[t]/n[t]
+  pi.samples <- sigm(samples)
+  pi.mean <- cumsum(pi.samples)/1:length(samples)
+  CI <- CI(pi.samples, burn, alpha, ci.by)
+  
+  plot(1:length(samples), pi.mean, type = "l", ylim = c(0,1))
+  lines(CI$idx, CI$upper, col = "red")
+  lines(CI$idx, CI$lower, col = "red")
+  abline(a = pi, b = 0, col = "blue")
+  
+  # par(mfrow = c(2, 1))
+  # plot(1:length(samples), tau.mean, type = "l", ylim = c(-2, 2))
+  # lines(CI$idx, CI$upper, col = "red")
+  # lines(CI$idx, CI$lower, col = "red")
+}
+
 # Construct Q without the 1/sigma factor
 Q <- diag(rep(2, T))
 Q[row(Q) - col(Q) == 1] <-  Q[row(Q) - col(Q) == -1] <- -1
@@ -75,15 +107,15 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
     # Sample tau
     for(j in 1:T){
       # Generate proposal
-      mu.cond <- -1/Q[j,j] * Q[j, 1:T != j]%*% (tau.mat[i - 1, 1:T != j])
+      mu.cond <- -1/Q[j,j] * Q[j, 1:T != j] %*% (tau.mat[i - 1, 1:T != j])
       Q.cond <-  1/sigma.vec[i-1] * Q[j,j]
       tau.prop <- rnorm(1, mu.cond, sqrt(1/Q.cond))
       
       # Calculate acceptance prob.
-      alpha <- alpha.c(j, tau.prop, tau.mat[i - 1, j])
-      alpha.vec[i-1] <- alpha
+      accept.prob <- alpha.c(j, tau.prop, tau.mat[i - 1, j])
+      alpha.vec[i-1] <- accept.prob
       u <- runif(1)
-      if(u < alpha){
+      if(u < accept.prob){
         tau.mat[i, j] = tau.prop
         count <- count + 1
       } else{
@@ -105,7 +137,6 @@ alpha <- 2
 beta <- 0.05
 
 # testing
-
 mcmc.1k <- mcmc.iterative(50000, sigma0 =  0.02, tau0 = rnorm(T))
 mean(mcmc.1k$alpha)
 plot(tail(mcmc.1k$sigma.vec, 50000), type = "l")
@@ -113,6 +144,12 @@ plot(tail(mcmc.1k$tau.mat[,201], 50000), type = "l")
 hist(tail(1/mcmc.1k$sigma.vec, 9000), breaks = 50)
 hist(tail(mcmc.1k$tau.mat[,201],40000), freq = FALSE, breaks = 100, add = TRUE)
 mcmc.1k$sigma.vec
+plot(sigm(mcmc.1k$tau.mat[,1]), type = "l")
+abline( a = y[1]/n[1], b = 0, col = "red")
+
+CI(mcmc.1k$tau.mat[,1], burn = 0)
+plot.pi(1, mcmc.1k$tau.mat[,5])
+
 
 # Run MCMC
 set.seed(4300)
@@ -121,11 +158,14 @@ ptm <- proc.time() # For computation time
 mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = runif(T))
 (proc.time() - ptm)[3] # Computation time of MCMC
 
+
 # Some plotting
 plot(1:num.iter, mcmc$sigma.vec, type = "l")
 plot(1:num.iter, mcmc$tau.mat[,201], type = "l")
 hist(mcmc$tau.mat[,1], breaks = 100, freq = FALSE)
 hist(tail(1/mcmc$sigma.vec, 40000), breaks = 100, freq = FALSE)
+
+
 
 
 mcmc.df <- data.frame(x = 1:num.iter, tau1 = mcmc$tau.mat[, 1],
