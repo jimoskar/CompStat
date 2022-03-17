@@ -93,7 +93,7 @@ mod.a <- inla(n.rain ~ -1 + f(day, model="rw1",
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
 
-# We consider the following model in INLA:
+# Model with intercept and constraint 
 mod.intercept <- inla(n.rain ~ f(day, model="rw1", 
                         hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))),
                         constr=TRUE),
@@ -103,5 +103,16 @@ mod.intercept <- inla(n.rain ~ f(day, model="rw1",
 # Plot predictions together
 df <- data.frame(x = 1:T, pred.a =  sigm(mod.a$summary.random$day$mean),
                  pred.int =  sigm(mod.intercept$summary.random$day$mean + mod.intercept$summary.fixed$mean))
-ggplot(df, aes(x = x)) + geom_line(aes(y = pred.a)) + geom_line(aes(y = pred.int))
-y = sigm(mod$summary.random$day$mean)
+ggplot(df, aes(x = x)) + geom_line(aes(y = pred.a, color = "Without intercept")) + 
+  geom_line(aes(y = pred.int, color = "With intercept")) + 
+  scale_color_manual(name = " ", values = c("Without intercept" = "red", "With intercept" = "blue")) + 
+  xlab("Day in year, t") + ylab(expression("Predictions of "~pi)) + theme_minimal()
+
+# Plot values of tau
+df <- data.frame(x = 1:T, pred.a =  mod.a$summary.random$day$mean,
+                 pred.int =  mod.intercept$summary.random$day$mean)
+ggplot(df, aes(x = x)) + geom_line(aes(y = pred.a, color = "Without intercept")) + 
+  geom_line(aes(y = pred.int, color = "With intercept")) + 
+  scale_color_manual(name = " ", values = c("Without intercept" = "red", "With intercept" = "blue")) + 
+  xlab("Day in year, t") + ylab(expression("Predictions of "~tau)) + theme_minimal()
+
