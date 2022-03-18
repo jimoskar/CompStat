@@ -143,7 +143,7 @@ problem.e <- function(){
   beta <- 0.05
   
   # Run the MCMC
-  num.iter <- 50000
+  num.iter <- 1000
   set.seed(4300)
   ptm <- proc.time()
   mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
@@ -159,26 +159,26 @@ problem.e <- function(){
   ## Traceplots, histograms, and sample autocorrelation functions
   mcmc.data <- data.frame("x"         = 1:num.iter,
                           "sigma.vec" = mcmc$sigma.vec,
-                          "tau_1"     = mcmc$tau.mat[,1],
-                          "tau_201"   = mcmc$tau.mat[,201],
-                          "tau_366"   = mcmc$tau.mat[,366]
+                          "pi_1"     = sigm(mcmc$tau.mat[,1]),
+                          "pi_201"   = sigm(mcmc$tau.mat[,201]),
+                          "pi_366"   = sigm(mcmc$tau.mat[,366])
   )
   max.lag <- 20
   mcmc.corr <- data.frame("lag"       = 0:max.lag,
                           "sigma.vec" = sacf(mcmc$sigma.vec)$rho.hat,
-                          "tau_1"     = sacf(mcmc$tau.mat[,1])$rho.hat,
-                          "tau_201"   = sacf(mcmc$tau.mat[,201])$rho.hat,
-                          "tau_366"   = sacf(mcmc$tau.mat[,366])$rho.hat
+                          "pi_1"     = sacf(sigm(mcmc$tau.mat[,1]))$rho.hat,
+                          "pi_201"   = sacf(sigm(mcmc$tau.mat[,201]))$rho.hat,
+                          "pi_366"   = sacf(sigm(mcmc$tau.mat[,366]))$rho.hat
                           )
   
   # Traceplots, histograms, and sample autocorrelation for sigma^2
   traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
-    geom_line() + xlab("Iterations") + ylab("Variance") +
+    geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
     theme_minimal()
   ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
   
   histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-    geom_histogram(binwidth=0.01) + xlab("Variance") + ylab("Count") +
+    geom_histogram(binwidth=0.01) + xlab(expression(sigma[u]^2)) + ylab("Count") +
     theme_minimal()
   ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
   
@@ -190,27 +190,30 @@ problem.e <- function(){
   
   # tau_1, tau_201, tau_366
   traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
-    geom_line(aes(y=tau_1, colour="tau_1"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=tau_201, colour="tau_201"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=tau_366, colour="tau_366"),size=0.25, alpha=0.6) +
-    scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green")) +
-    xlab("Iterations") + ylab("Tau") + xlim(0, 1000) + theme_minimal()
+    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.6) +
+    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.6) +
+    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.6) +
+    scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
+                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+    xlab("Iterations") + ylab(" ") + theme_minimal()
   traceplot.tau
   ggsave("./figures/traceplot_tau.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
   
   histogram.tau <- ggplot(mcmc.data) + 
-    geom_histogram(aes(x=tau_1, fill="tau_1"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=tau_201, fill="tau_201"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=tau_366, fill="tau_366"), binwidth=0.05, alpha=0.6) + 
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green")) +
-    xlab("Tau") + ylab("Count") + theme_minimal()
+    geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.05, alpha=0.6) + 
+    geom_histogram(aes(x=pi_201, fill="tau_201"), binwidth=0.05, alpha=0.6) + 
+    geom_histogram(aes(x=pi_366, fill="tau_366"), binwidth=0.05, alpha=0.6) + 
+    scale_fill_manual(name = " ", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+    xlab(" ") + ylab("Count") + theme_minimal()
   ggsave("./figures/histogram_tau.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
   
   correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
-    geom_line(aes(y=tau_1, colour="tau_1"),size=0.25) +
-    geom_line(aes(y=tau_201, colour="tau_201"),size=0.25) +
-    geom_line(aes(y=tau_366, colour="tau_366"),size=0.25) +
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green")) +
+    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
+    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
+    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
+    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
     xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
   ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
   
@@ -346,9 +349,9 @@ problem.f <- function(){
   ## Traceplots, histograms, and estimated autocorrelation functions
   mcmc.data.all <- data.frame(x         = 1:num.iter,
                           sigma.vec = mcmc$sigma.vec[],
-                          tau_1     = mcmc$tau.mat[,1],
-                          tau_201   = mcmc$tau.mat[,201],
-                          tau_366   = mcmc$tau.mat[,366]
+                          pi_1     = sigm(mcmc$tau.mat[,1]),
+                          pi_201   = sigm(mcmc$tau.mat[,201]),
+                          pi_366   = sigm(mcmc$tau.mat[,366])
   )
   burn.in = 100
   if(burn.in){
@@ -360,20 +363,20 @@ problem.f <- function(){
   max.lag <- 20
   mcmc.corr <- data.frame(lag       = 0:max.lag,
                           sigma.vec = sacf(mcmc.data$sigma.vec)$rho.hat,
-                          tau_1     = sacf(mcmc.data$tau_1)$rho.hat,
-                          tau_201   = sacf(mcmc.data$tau_201)$rho.hat,
-                          tau_366   = sacf(mcmc.data$tau_366)$rho.hat
+                          pi_1     = sacf(sigm(mcmc$tau.mat[,1]))$rho.hat,
+                          pi_201   = sacf(sigm(mcmc$tau.mat[,201]))$rho.hat,
+                          pi_366   = sacf(sigm(mcmc$tau.mat[,366]))$rho.hat
   )
   
   # sigma^2
   traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
-    geom_line() + xlab("Iterations") + ylab("Variance") +
+    geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
     theme_minimal()
   #traceplot.sigma
   ggsave("./figures/traceplot_sigma2_block.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
   
   histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-    geom_histogram(binwidth=0.002) + xlab("Variance") + ylab("Count") +
+    geom_histogram(binwidth=0.002) + xlab(expression(sigma[u]^2)) + ylab("Count") +
     theme_minimal()
   #histogram.sigma
   ggsave("./figures/histogram_sigma2_block.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
@@ -387,28 +390,31 @@ problem.f <- function(){
   
   # tau_1, tau_201, tau_366
   traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
-    geom_line(aes(y=tau_1, colour="tau_1"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=tau_201, colour="tau_201"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=tau_366, colour="tau_366"),size=0.25, alpha=0.6) +
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green")) +
-    xlab("Iterations") + ylab("Tau") + xlim(0, 1000) + theme_minimal()
+    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.6) +
+    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.6) +
+    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.6) +
+    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+    xlab("Iterations") + ylab(" ") + theme_minimal()
   #traceplot.tau
   ggsave("./figures/traceplot_tau_block.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
   
   histogram.tau <- ggplot(mcmc.data) + 
-    geom_histogram(aes(x=tau_1, fill="tau_1"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=tau_201, fill="tau_201"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=tau_366, fill="tau_366"), binwidth=0.05, alpha=0.6) + 
-    scale_color_manual(name=" ", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green")) +
-    xlab("Tau") + ylab("Count") + theme_minimal()
+    geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.05, alpha=0.6) + 
+    geom_histogram(aes(x=pi_201, fill="tau_201"), binwidth=0.05, alpha=0.6) + 
+    geom_histogram(aes(x=pi_366, fill="tau_366"), binwidth=0.05, alpha=0.6) + 
+    scale_fill_manual(name=" ", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
+                      labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+    xlab(" ") + ylab("Count") + theme_minimal()
   #histogram.tau
   ggsave("./figures/histogram_tau_block2.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
   
   correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
-    geom_line(aes(y=tau_1, colour="tau_1"),size=0.25) +
-    geom_line(aes(y=tau_201, colour="tau_201"),size=0.25) +
-    geom_line(aes(y=tau_366, colour="tau_366"),size=0.25) +
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green")) +
+    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
+    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
+    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
+    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
     xlab("Lag") + ylab("Correlation") + theme_minimal()
   #correlation.tau
   ggsave("./figures/correlation_tau_block.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
