@@ -141,7 +141,7 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
 
 }
 
-problem.e <- function(){
+problem.1e <- function(){
   y <- rain$n.rain  # response
   n <- rain$n.years # number of years
   T <- length(y)    # days in a year (366)
@@ -157,7 +157,7 @@ problem.e <- function(){
   beta <- 0.05
   
   # Run the MCMC
-  num.iter <- 1000
+  num.iter <- 50000
   set.seed(4300)
   ptm <- proc.time()
   mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
@@ -178,7 +178,7 @@ problem.e <- function(){
                           "pi_366"   = sigm(mcmc$tau.mat[,366])
   )
   
-  burn.in = 100
+  burn.in = 0
   if(burn.in){
     mcmc.data <- mcmc.data.all[-(1:burn.in),]
   } else{
@@ -210,11 +210,11 @@ problem.e <- function(){
   ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
   
   
-  # tau_1, tau_201, tau_366
+  # pi_1, pi_201, pi_366
   traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
-    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.6) +
-    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.6) +
+    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.4) +
+    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.4) +
+    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.4) +
     scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
                        labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
     xlab("Iterations") + ylab(" ") + theme_minimal()
@@ -252,12 +252,14 @@ problem.e <- function(){
                           pi = pi.df$pi[tau.idx], 
                           lower = pi.df$lower[tau.idx],
                           upper = pi.df$upper[tau.idx])
-  round(tau.table,4)
+  print(tau.table)
   
-  mean(mcmc$sigma.vec)
-  quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+  sigma.q <- quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+  sigma.table = c(pred = mean(mcmc$sigma.vec), lower = sigma.q[1], upper = sigma.q[2])
+  print(sigma.table)
 }
 
+problem.1e()
 
 ## f) ----
 
