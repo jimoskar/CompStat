@@ -35,6 +35,13 @@ problem.2a <- function(){
     theme_minimal()
 }
 
+mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
+                            hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
+                            constr=FALSE),
+            data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
+            family="binomial", verbose=TRUE, control.inla=control.inla)
+sqrt(1/mod$summary.hyperpar$mean)
+
 problem.2a()
 # Plot marginals
 plot(inla.smarginal(mod$marginals.random$day$index.201), type = "l")
