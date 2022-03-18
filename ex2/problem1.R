@@ -310,7 +310,7 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
   }
   
   return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
-
+}
 
 
 problem.f <- function(){
