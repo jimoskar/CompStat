@@ -51,41 +51,47 @@ plot(inla.smarginal(m))
 
 ## b) ----
 # Plot prediction for 12 different control input combinations
-problem.2b <- function(){
-  strategy = c('gaussian', 'simplified.laplace', 'laplace', 'adaptive')
-  int.strategy = c('ccd', 'grid', 'eb')
-  controls <- expand.grid(strategy, int.strategy)
+strategy = c('gaussian', 'simplified.laplace', 'laplace', 'adaptive')
+int.strategy = c('ccd', 'grid', 'eb')
+controls <- expand.grid(strategy, int.strategy)
+
+pal <- unname(tol()) # Color palette
+times <- rep(NA, 12) # Computation times
+sc <- list() # For ggplot
+p <- ggplot() # Init. plot
+max.vec <- c() # Vector for maximal value in preds
+combs <- 1:12 # Combination index
+for(i in combs){
+  # Set inputs
+  control.inla = list(strategy=paste(controls[i,1]), 
+                      int.strategy=paste(controls[i,2]))
+  # Fit model and time it
+  ptm <- proc.time()
+  mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
+                              hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
+                              constr=FALSE),
+              data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
+              family="binomial", verbose=TRUE, control.inla=control.inla)
+  times[i] <- (proc.time() - ptm)[3]
   
-  pal <- unname(tol()) # Color palette
-  times <- rep(NA, 12) # Computation times
-  sc <- list() # For ggplot
-  p <- ggplot() # Init. plot
-  for(i in 1:12){
-    # Set inputs
-    control.inla = list(strategy=paste(controls[i,1]), 
-                        int.strategy=paste(controls[i,2]))
-    # Fit model and time it
-    ptm <- proc.time()
-    mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
-                                hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
-                                constr=FALSE),
-                data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
-                family="binomial", verbose=TRUE, control.inla=control.inla)
-    times[i] <- (proc.time() - ptm)[3]
-    
-    p <- p + geom_line(data = data.frame(x = 1:T, y = sigm(mod$summary.random$day$mean)),
-                       aes(x, y, color = paste(i)), size = 0.1)
-    sc[[i]] = pal[i]
-  }
-  
-  names(sc) <- 1:12
-  p + scale_color_manual(name = " ",  values = unlist(sc))+
-    xlab("t")  + ylab(expression(pi)) + theme_minimal()
-  
-  comp.times <- data.frame(strategy = controls[, 1], 
-                     int.strategy = controls[ ,2 ], 
-                     time = times)
+  preds <- sigm(mod$summary.random$day$mean)
+  max.vec <- c(max.vec,max(preds))
+  p <- p + geom_line(data = data.frame(x = 1:T, y = preds),
+                     aes(x, y, color = paste(i)), size = 0.3)
+  p.list[[i]] = p
+  sc[[i]] = pal[i]
 }
+
+# Plotting
+names(sc) <- combs
+p + scale_color_manual(name = " ",  values = unlist(sc))+
+  xlab("t")  + ylab(expression(pi)) + theme_minimal()
+
+# Create dataframe of information
+summary.df <- data.frame(strategy = controls[, 1], 
+                   int.strategy = controls[ ,2 ], 
+                   time = times, max = max.vec)
+
 xtable(comp.times)
 
 plot(inla.smarginal(mod$marginals.random$day$index.366), type = "l")
