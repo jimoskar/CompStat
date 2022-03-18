@@ -30,9 +30,22 @@ sigm <- function(tau){
 # Function to calculate acceptance probability, works for single and multiple indecies I
 acceptance.probability <- function(I, tau.proposal, tau.current){
   log.acc <- y[I]*(tau.proposal - tau.current) +
-    n[I]*log((1 + exp(tau.current))/(1 + exp(tau.proposal)))
+    n[I]*( log(1 + exp(tau.current)) - log(1 + exp(tau.proposal)) )
+  
   return( min(1, exp(sum(log.acc))) )
 }
+
+# Acceptance rate 0.7
+expit <- function(x) 1/(exp(-x)+1)
+neg.log.expit <- function(x) log(exp(-x)+1)
+
+tau.accept <- function(t, tau.prop, tau.curr){
+  log.acc <- y[t] * ( neg.log.expit(tau.curr) - neg.log.expit(tau.prop) ) +
+    (y[t] - n[t]) * ( neg.log.expit(-tau.curr) - neg.log.expit(-tau.prop) )
+  
+  min(1, exp(log.acc))
+}
+
 
 # Function for calculating 100(1-alpha) credible intervals
 CI <- function(samples, burn = 0, alpha = 0.05, by = 1000){
@@ -84,11 +97,6 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   }
 }
 
-# Construct Q without the 1/sigma factor
-Q <- diag(rep(2, T))
-Q[abs(row(Q) - col(Q)) == 1] <- -1
-Q[1,1] <- Q[T,T] <- 1
-
 # MCMC with iterative conditioning
 mcmc.iterative <- function(num.iter, sigma0, tau0){
   tau.mat      <- matrix(NA, nrow = num.iter, ncol = T)
@@ -103,11 +111,15 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
     # Sample tau
     for(t in 1:T){
       # Generate proposal
+      t=1
+      
       mu.cond <- -1/Q[t,t] * Q[t, 1:T != t] %*% (tau.mat[i-1, 1:T != t])
+      
       Q.cond <-  1/sigma.vec[i-1] * Q[t,t]
-      tau.prop <- rnorm(1, mu.cond, sqrt(1/Q.cond))
+      tau.prop <- rnorm(1, mean = mu.cond, sd = sqrt(1/Q.cond))
       
       # Calculate acceptance probability
+      #accept.prob <- tau.accept(t, tau.prop, tau.mat[i-1, t])
       accept.prob <- acceptance.probability(t, tau.prop, tau.mat[i-1, t])
       alpha.vec[i-1] <- accept.prob
       u <- runif(1)
@@ -137,7 +149,9 @@ problem.e <- function(){
   # Construct the precision matrix Q (without the 1/sigma^2_u factor)
   Q <- diag(c(1, rep(2, T-2), 1))
   Q[abs(row(Q) - col(Q)) == 1] <- -1
-
+  
+  Q[1:10, 1:10]
+  
   # Parameters for the prior of sigma^2
   alpha <- 2
   beta <- 0.05
@@ -150,19 +164,27 @@ problem.e <- function(){
   elapsed.time <- (proc.time() - ptm)[3]
   
   # Elapsed time
-  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
+  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds."))
   
   # Acceptance rate
-  acceptance.rate <- mcmc$count/(num.iter * T)
+  acceptance.rate <- mcmc$count/((num.iter-1) * T)
   print(paste("The acceptance rate is", round(acceptance.rate,8) ))
   
   ## Traceplots, histograms, and sample autocorrelation functions
-  mcmc.data <- data.frame("x"         = 1:num.iter,
+  mcmc.data.all <- data.frame("x"         = 1:num.iter,
                           "sigma.vec" = mcmc$sigma.vec,
                           "pi_1"     = sigm(mcmc$tau.mat[,1]),
                           "pi_201"   = sigm(mcmc$tau.mat[,201]),
                           "pi_366"   = sigm(mcmc$tau.mat[,366])
   )
+  
+  burn.in = 100
+  if(burn.in){
+    mcmc.data <- mcmc.data.all[-(1:burn.in),]
+  } else{
+    mcmc.data <- mcmc.data.all
+  }
+  
   max.lag <- 20
   mcmc.corr <- data.frame("lag"       = 0:max.lag,
                           "sigma.vec" = sacf(mcmc$sigma.vec)$rho.hat,
@@ -172,7 +194,7 @@ problem.e <- function(){
                           )
   
   # Traceplots, histograms, and sample autocorrelation for sigma^2
-  traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
+  traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
     geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
     theme_minimal()
   ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
@@ -189,7 +211,7 @@ problem.e <- function(){
   
   
   # tau_1, tau_201, tau_366
-  traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
+  traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
     geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.6) +
     geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.6) +
     geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.6) +
@@ -343,7 +365,7 @@ problem.f <- function(){
   print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
   
   # Acceptance rate
-  acceptance.rate <- mcmc$count/(num.iter * T)
+  acceptance.rate <- mcmc$count/((num.iter-1) * ceiling(T/M))
   print(paste("The acceptance rate is", round(acceptance.rate,8) ))
   
   ## Traceplots, histograms, and estimated autocorrelation functions
@@ -369,7 +391,7 @@ problem.f <- function(){
   )
   
   # sigma^2
-  traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
+  traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
     geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
     theme_minimal()
   #traceplot.sigma
@@ -389,7 +411,7 @@ problem.f <- function(){
   
   
   # tau_1, tau_201, tau_366
-  traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
+  traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
     geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.6) +
     geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.6) +
     geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.6) +
@@ -421,32 +443,49 @@ problem.f <- function(){
   
   
   # Estimate computation time/acceptance rate as function of M
-  Ms <- 1:20
-  elapsed.times <- numeric(20)
-  acceptance.probabilities <- numeric(20)
+  Ms               <- 1:100
+  elapsed.times    <- numeric(100)
+  acceptance.rates <- numeric(100)
   
   for(M in Ms){
     # Run MCMC
     num.iter <- 1000
     set.seed(4300)
     ptm <- proc.time()
-    mcmc <- mcmc.block(num.iter, sigma0 =  0.02, tau0 = rnorm(T), M = M)
+    mcmc <- mcmc.block(num.iter, sigma0 =  0.02, tau0 = runif(T, min=-3, max=0), M = M)
     elapsed.time <- (proc.time() - ptm)[3]
     print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
-    
+    ?runif
     # Calculate acceptance rate
-    acceptance.rate <- mcmc$count/(num.iter * T)
-    print(paste("The acceptance rate is", round(acceptance.rate,8) ))
+    acceptance.rate <- mcmc$count/((num.iter-1) * ceiling(T/M))
+    print(paste("The acceptance rate for M=", M, "is", round(acceptance.rate,8) ))
     
     elapsed.times[M] <- elapsed.time
-    acceptance.probabilities[M] <- acceptance.rate
+    acceptance.rates[M] <- acceptance.rate
   }
   
-  plot(elapsed.times[-1], type='l')
-  plot(acceptance.probabilities[-1], type='l')
+  data.M <- data.frame("M" = Ms,
+                       "elapsed.times" = elapsed.times,
+                       "acceptance.rates" = acceptance.rates)
+  
+  plot(elapsed.times, type='l')
+  plot(acceptance.rates, type='l')
+  
+  elapsed.times.plot <- ggplot(data.M, aes(x=M, y=elapsed.times)) + 
+    geom_line() + xlab("Block size M") + ylab("Computation time [seconds]") +
+    theme_minimal()
+  elapsed.times.plot
+  ggsave("./figures/elapsed.times.plot.pdf", plot = elapsed.times.plot, height = 2.5, width = 5.0)
+  
+  acceptance.rates.plot <- ggplot(data.M, aes(x=M, y=acceptance.rates)) + 
+    geom_line() + xlab("Block size M") + ylab("Acceptance rates") +
+    theme_minimal()
+  acceptance.rates.plot
+  ggsave("./figures/acceptance.rates.plot.pdf", plot = acceptance.rates.plot, height = 2.5, width = 5.0)
+  
   
   # plot relative number of accepted values per calculation time
-  rel.acceptance.rate.per.time <- acceptance.probabilities / elapsed.times
+  rel.acceptance.rate.per.time <- ceiling(T/Ms)/T * acceptance.rates / elapsed.times
   rel.acceptance.rate.per.time <- rel.acceptance.rate.per.time / max(rel.acceptance.rate.per.time)
   
   plot(rel.acceptance.rate.per.time, type='l')
