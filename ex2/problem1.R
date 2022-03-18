@@ -26,18 +26,6 @@ logit <- function(x){
 sigm <- function(tau){
   return(exp(tau)/(1 + exp(tau)))
 }
-log.sigm <- function(tau){
-  return(-log(exp(-tau) + 1))
-}
-log.1m.sigm <- function(tau){
-  return(-log(exp(tau) + 1))
-}
-
-# Function to sample from inverse gamma
-rigamma <- function(n, a, b){
-  # Uses shape and scale
-  return(1/rgamma(n, shape = a, rate = 1/b))
-}
 
 # Function to calculate acceptance probability, works for single and multiple indecies I
 acceptance.probability <- function(I, tau.proposal, tau.current){
@@ -96,6 +84,11 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   }
 }
 
+# Construct Q without the 1/sigma factor
+Q <- diag(rep(2, T))
+Q[abs(row(Q) - col(Q)) == 1] <- -1
+Q[1,1] <- Q[T,T] <- 1
+
 # MCMC with iterative conditioning
 mcmc.iterative <- function(num.iter, sigma0, tau0){
   tau.mat      <- matrix(NA, nrow = num.iter, ncol = T)
@@ -131,9 +124,10 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
     scale <- 0.5*tQt + beta
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
+  
   return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
-}
 
+}
 
 problem.e <- function(){
   y <- rain$n.rain  # response
@@ -240,7 +234,6 @@ problem.e <- function(){
 }
 
 
-
 ## f) ----
 
 mcmc.block <- function(num.iter, sigma0, tau0, M){
@@ -300,7 +293,6 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
       
       # Calculate acceptance prob.
       accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
-      alpha.vec[i-1] <- accept.prob
       
       u <- runif(1)
       if(u < accept.prob){
@@ -316,8 +308,9 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
     scale <- 0.5*tQt + beta
     sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
+  
   return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
-}
+
 
 
 problem.f <- function(){
