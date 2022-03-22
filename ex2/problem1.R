@@ -62,19 +62,6 @@ CI <- function(samples, burn = 0, alpha = 0.05, by = 1000){
   return(ci.mat)
 }
 
-# maybe useless function
-plot.pi <- function(t, samples, burn = 0, alpha = 0.05, ci.by = 1000){
-  pi <- y[t]/n[t]
-  pi.samples <- sigm(samples)
-  pi.mean <- cumsum(pi.samples)/1:length(samples)
-  CI <- CI(pi.samples, burn, alpha, ci.by)
-  
-  plot(1:length(samples), pi.mean, type = "l", ylim = c(0,1))
-  lines(CI$idx, CI$upper, col = "red")
-  lines(CI$idx, CI$lower, col = "red")
-  abline(a = pi, b = 0, col = "blue")
-}
-
 # Function for plotting mcmc preds or making dataset. should maybe split up
 plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   tau.mat <- tau.mat[burn:nrow(tau.mat), ]
@@ -97,8 +84,22 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   }
 }
 
+sample.sigma2 <- function(tau){
+  # Constants
+  alpha <- 2
+  beta <- 0.05
+  Time <- 366
+  
+  # Calc. params for inverse gamma
+  tQt <- sum(diff(tau)^2)
+  shape <- alpha + (Time-1)/2
+  scale <- 0.5*tQt + beta
+  return(1/rgamma(1, shape = shape, rate = scale))
+}
+
 # MCMC with iterative conditioning
 mcmc.iterative <- function(num.iter, sigma0, tau0){
+  # Initialize
   tau.mat      <- matrix(NA, nrow = num.iter, ncol = T)
   tau.mat[1, ] <- tau0
   sigma.vec    <- rep(NA, num.iter)
@@ -106,39 +107,29 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
   count        <- 0 # Count of accepted tau-samples
   alpha.vec    <- rep(NA, num.iter - 1)
   
-  # Iterations
   for(i in 2:num.iter){
+    # Generate Gibbs sample for sigma2
+    sigma.vec[i] <- sample.sigma2(tau.mat[i - 1, ])
+    
     # Sample tau
+    tau.mat[i, ] <-  tau.mat[i - 1, ]
     for(t in 1:T){
       # Generate proposal
-      t=1
-      
-      mu.cond <- -1/Q[t,t] * Q[t, 1:T != t] %*% (tau.mat[i-1, 1:T != t])
-      
-      Q.cond <-  1/sigma.vec[i-1] * Q[t,t]
+      mu.cond <- -1/Q[t,t] * Q[t, 1:T != t] %*% (tau.mat[i, 1:T != t])
+      Q.cond <-  1/sigma.vec[i] * Q[t,t]
       tau.prop <- rnorm(1, mean = mu.cond, sd = sqrt(1/Q.cond))
       
       # Calculate acceptance probability
-      #accept.prob <- tau.accept(t, tau.prop, tau.mat[i-1, t])
-      accept.prob <- acceptance.probability(t, tau.prop, tau.mat[i-1, t])
+      accept.prob <- acceptance.probability(t, tau.prop, tau.mat[i, t])
       alpha.vec[i-1] <- accept.prob
       u <- runif(1)
       if(u < accept.prob){
         tau.mat[i, t] = tau.prop
         count <- count + 1
-      } else{
-        tau.mat[i, t] = tau.mat[i-1, t]
       }
     }
-    # Generate Gibbs sample for sigma
-    tQt <- sum(diff(tau.mat[i, ])^2)
-    shape <- alpha + (T-1)/2
-    scale <- 0.5*tQt + beta
-    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
   }
-  
-  return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
-
+  return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
 
 problem.1e <- function(){
@@ -339,6 +330,24 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
   return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
 }
 
+# Testing ----
+y <- rain$n.rain  # response
+n <- rain$n.years # number of years
+T <- length(y)    # days in a year (366)
+
+# Construct the precision matrix Q (without the 1/sigma^2_u factor)
+Q <- diag(c(1, rep(2, T-2), 1))
+Q[abs(row(Q) - col(Q)) == 1] <- -1
+
+# Parameters for the prior of sigma^2
+alpha <- 2
+beta <- 0.05
+
+mcmc.it <- mcmc.iterative(1000, sigma0 =  0.02, tau0 = rnorm(T))
+mean(tail(mcmc.it$sigma.vec, -100))
+plot(mcmc.it$sigma.vec, type = "l")
+mcmc.it$count/(366*1000)
+hist(1/tail(mcmc$sigma.vec,9000), breaks = 100, freq = FALSE, add = TRUE)
 
 problem.f <- function(){
   y <- rain$n.rain  # response

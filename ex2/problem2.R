@@ -6,8 +6,7 @@ load("rain.rda")
 alpha <- 2
 beta <- 0.05
 T <- 366 # days in a year
-n <- rep(39, T) # n in binom. distr.
-n[60] = 10 # corrigate for feb 29th
+n <- rain$n.years
 y <- rain$n.rain # response
   
 ## a) ----
@@ -35,12 +34,16 @@ problem.2a <- function(){
     theme_minimal()
 }
 
+control.inla = list(strategy="simplified.laplace", int.strategy="ccd")
 mod <- inla(n.rain ~ -1 + f(day, model="rw1", 
                             hyper = list(theta = list(prior="loggamma", param=c(alpha, beta))), 
                             constr=FALSE),
             data=rain, Ntrials=n.years, control.compute=list(config = TRUE),
             family="binomial", verbose=TRUE, control.inla=control.inla)
-sqrt(1/mod$summary.hyperpar$mean)
+1/mod$summary.hyperpar$mean
+mod$summary.fitted.values$mean
+
+plot(inla.smarginal(mod$marginals.hyperpar$`Precision for day`), type = "l")
 
 problem.2a()
 # Plot marginals
