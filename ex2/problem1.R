@@ -76,7 +76,8 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
       geom_line(aes(y = pi, color = "pi")) +
       geom_line(aes(y = p, color = "yt/nt"), alpha = 0.1) +
       xlab("Day in year") + ylab(expression(pi)) +
-      scale_color_manual(name = " ", values = c("yt/nt" = "blue", "MCMC-predictions" = "black")) +
+      scale_color_manual(name = " ", values = c("yt/nt" = "blue", "MCMC-predictions" = "black"),
+                         labels = c(expression(y[t]/n[t]), "MCMC-predictions")) +
       theme_minimal()
     return(plot)
   } else{
@@ -84,6 +85,7 @@ plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   }
 }
 
+# Helping function for mcmc.single
 sample.sigma2 <- function(tau){
   # Constants
   alpha <- 2
@@ -98,7 +100,7 @@ sample.sigma2 <- function(tau){
 }
 
 # MCMC with iterative conditioning
-mcmc.iterative <- function(num.iter, sigma0, tau0){
+mcmc.single <- function(num.iter, sigma0, tau0){
   # Initialize
   tau.mat      <- matrix(NA, nrow = num.iter, ncol = T)
   tau.mat[1, ] <- tau0
@@ -132,125 +134,124 @@ mcmc.iterative <- function(num.iter, sigma0, tau0){
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
 
-problem.1e <- function(){
-  y <- rain$n.rain  # response
-  n <- rain$n.years # number of years
-  T <- length(y)    # days in a year (366)
-  
-  # Construct the precision matrix Q (without the 1/sigma^2_u factor)
-  Q <- diag(c(1, rep(2, T-2), 1))
-  Q[abs(row(Q) - col(Q)) == 1] <- -1
-  
-  Q[1:10, 1:10]
-  
-  # Parameters for the prior of sigma^2
-  alpha <- 2
-  beta <- 0.05
-  
-  # Run the MCMC
-  num.iter <- 50000
-  set.seed(4300)
-  ptm <- proc.time()
-  mcmc <- mcmc.iterative(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
-  elapsed.time <- (proc.time() - ptm)[3]
-  
-  # Elapsed time
-  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds."))
-  
-  # Acceptance rate
-  acceptance.rate <- mcmc$count/((num.iter-1) * T)
-  print(paste("The acceptance rate is", round(acceptance.rate,8) ))
-  
-  ## Traceplots, histograms, and sample autocorrelation functions
-  mcmc.data.all <- data.frame("x"         = 1:num.iter,
-                          "sigma.vec" = mcmc$sigma.vec,
-                          "pi_1"     = sigm(mcmc$tau.mat[,1]),
-                          "pi_201"   = sigm(mcmc$tau.mat[,201]),
-                          "pi_366"   = sigm(mcmc$tau.mat[,366])
-  )
-  
-  burn.in = 0
-  if(burn.in){
-    mcmc.data <- mcmc.data.all[-(1:burn.in),]
-  } else{
-    mcmc.data <- mcmc.data.all
-  }
-  
-  max.lag <- 20
-  mcmc.corr <- data.frame("lag"       = 0:max.lag,
-                          "sigma.vec" = sacf(mcmc$sigma.vec)$rho.hat,
-                          "pi_1"     = sacf(sigm(mcmc$tau.mat[,1]))$rho.hat,
-                          "pi_201"   = sacf(sigm(mcmc$tau.mat[,201]))$rho.hat,
-                          "pi_366"   = sacf(sigm(mcmc$tau.mat[,366]))$rho.hat
-                          )
-  
-  # Traceplots, histograms, and sample autocorrelation for sigma^2
-  traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
-    geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-    theme_minimal()
-  ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
-  
-  histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-    geom_histogram(binwidth=0.01) + xlab(expression(sigma[u]^2)) + ylab("Count") +
-    theme_minimal()
-  ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
-  
-  correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) + 
-    geom_line() + xlab("Iteration lag") + ylab("Autocorrelation") +
-    theme_minimal()
-  ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
-  
-  
-  # pi_1, pi_201, pi_366
-  traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
-    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.4) +
-    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.4) +
-    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.4) +
-    scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
-                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab("Iterations") + ylab(" ") + theme_minimal()
-  traceplot.tau
-  ggsave("./figures/traceplot_tau.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
-  
-  histogram.tau <- ggplot(mcmc.data) + 
-    geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=pi_201, fill="tau_201"), binwidth=0.05, alpha=0.6) + 
-    geom_histogram(aes(x=pi_366, fill="tau_366"), binwidth=0.05, alpha=0.6) + 
-    scale_fill_manual(name = " ", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
-                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab(" ") + ylab("Count") + theme_minimal()
-  ggsave("./figures/histogram_tau.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
-  
-  correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
-    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
-    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
-    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
-                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
-  ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
-  
-  
-  # Plot predictions of pi
-  pi.preds <- plot.preds(mcmc$tau.mat)
-  ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
-  
-  # Calculate statistics for tau_1, tau_201, tau_366 and sigma
-  tau.idx <- c(1, 201, 366)
-  pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
-  
-  tau.table <- data.frame(idx = tau.idx,
-                          pi = pi.df$pi[tau.idx], 
-                          lower = pi.df$lower[tau.idx],
-                          upper = pi.df$upper[tau.idx])
-  print(tau.table)
-  
-  sigma.q <- quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
-  sigma.table = c(pred = mean(mcmc$sigma.vec), lower = sigma.q[1], upper = sigma.q[2])
-  print(sigma.table)
+## Script 1e) ----
+y <- rain$n.rain  # response
+n <- rain$n.years # number of years
+T <- length(y)    # days in a year (366)
+
+# Construct the precision matrix Q (without the 1/sigma^2_u factor)
+Q <- diag(c(1, rep(2, T-2), 1))
+Q[abs(row(Q) - col(Q)) == 1] <- -1
+
+# Parameters for the prior of sigma^2
+alpha <- 2
+beta <- 0.05
+
+# Run the MCMC
+num.iter <- 50000
+set.seed(4300)
+ptm <- proc.time()
+mcmc <- mcmc.single(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
+elapsed.time <- (proc.time() - ptm)[3]
+
+# Elapsed time
+print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds."))
+
+# Acceptance rate
+acceptance.rate <- mcmc$count/((num.iter-1) * T)
+print(paste("The acceptance rate is", round(acceptance.rate,8) ))
+
+## Traceplots, histograms, and sample autocorrelation functions
+mcmc.data.all <- data.frame("x"         = 1:num.iter,
+                        "sigma.vec" = mcmc$sigma.vec,
+                        "pi_1"     = sigm(mcmc$tau.mat[,1]),
+                        "pi_201"   = sigm(mcmc$tau.mat[,201]),
+                        "pi_366"   = sigm(mcmc$tau.mat[,366])
+)
+
+burn.in = 500
+if(burn.in){
+  mcmc.data <- mcmc.data.all[-(1:burn.in),]
+} else{
+  mcmc.data <- mcmc.data.all
 }
 
-problem.1e()
+max.lag <- 20
+mcmc.corr <- data.frame("lag"       = 0:max.lag,
+                        "sigma.vec" = sacf(mcmc$sigma.vec)$rho.hat,
+                        "pi_1"     = sacf(sigm(mcmc$tau.mat[,1]))$rho.hat,
+                        "pi_201"   = sacf(sigm(mcmc$tau.mat[,201]))$rho.hat,
+                        "pi_366"   = sacf(sigm(mcmc$tau.mat[,366]))$rho.hat
+                        )
+
+# Traceplots, histograms, and sample autocorrelation for sigma^2
+traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
+  geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
+  theme_minimal()
+ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
+
+histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
+  geom_histogram(binwidth=0.0005) + xlab(expression(sigma[u]^2)) + ylab("Count") +
+  theme_minimal()
+histogram.sigma
+ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
+
+correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) + 
+  geom_line() + xlab("Iteration lag") + ylab("Autocorrelation") +
+  theme_minimal()
+ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
+
+
+# pi_1, pi_201, pi_366
+traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
+  geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.4) +
+  geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.4) +
+  geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.4) +
+  scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
+                     labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+  xlab("Iterations") + ylab(" ") + theme_minimal()
+traceplot.tau
+ggsave("./figures/traceplot_tau.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
+
+histogram.tau <- ggplot(mcmc.data) + 
+  geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.005, alpha=0.6) + 
+  geom_histogram(aes(x=pi_201, fill="tau_201"), binwidth=0.005, alpha=0.6) + 
+  geom_histogram(aes(x=pi_366, fill="tau_366"), binwidth=0.005, alpha=0.6) + 
+  scale_fill_manual(name = " ", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                     labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+  xlab(" ") + ylab("Count") + theme_minimal()
+histogram.tau
+ggsave("./figures/histogram_tau.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
+
+correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
+  geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
+  geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
+  geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
+  scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
+                     labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+  xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
+ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
+
+
+# Plot predictions of pi
+pi.preds <- plot.preds(mcmc$tau.mat)
+pi.preds
+ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
+
+# Calculate statistics for tau_1, tau_201, tau_366 and sigma
+tau.idx <- c(1, 201, 366)
+pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
+
+tau.table <- data.frame(idx = tau.idx,
+                        pi = pi.df$pi[tau.idx], 
+                        lower = pi.df$lower[tau.idx],
+                        upper = pi.df$upper[tau.idx])
+print(tau.table)
+
+sigma.q <- quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+sigma.table = c(pred = mean(mcmc$sigma.vec), lower = sigma.q[1], upper = sigma.q[2])
+print(sigma.table)
+
 
 ## f) ----
 
@@ -330,24 +331,6 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
   return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
 }
 
-# Testing ----
-y <- rain$n.rain  # response
-n <- rain$n.years # number of years
-T <- length(y)    # days in a year (366)
-
-# Construct the precision matrix Q (without the 1/sigma^2_u factor)
-Q <- diag(c(1, rep(2, T-2), 1))
-Q[abs(row(Q) - col(Q)) == 1] <- -1
-
-# Parameters for the prior of sigma^2
-alpha <- 2
-beta <- 0.05
-
-mcmc.it <- mcmc.iterative(1000, sigma0 =  0.02, tau0 = rnorm(T))
-mean(tail(mcmc.it$sigma.vec, -100))
-plot(mcmc.it$sigma.vec, type = "l")
-mcmc.it$count/(366*1000)
-hist(1/tail(mcmc$sigma.vec,9000), breaks = 100, freq = FALSE, add = TRUE)
 
 problem.f <- function(){
   y <- rain$n.rain  # response
