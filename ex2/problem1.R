@@ -96,6 +96,7 @@ sample.sigma2 <- function(tau){
   tQt <- sum(diff(tau)^2)
   shape <- alpha + (Time-1)/2
   scale <- 0.5*tQt + beta
+  print(scale)
   return(1/rgamma(1, shape = shape, rate = scale))
 }
 
@@ -110,15 +111,12 @@ mcmc.single <- function(num.iter, sigma0, tau0){
   alpha.vec    <- rep(NA, num.iter - 1)
   
   for(i in 2:num.iter){
-    # Generate Gibbs sample for sigma2
-    sigma.vec[i] <- sample.sigma2(tau.mat[i - 1, ])
-    
     # Sample tau
     tau.mat[i, ] <-  tau.mat[i - 1, ]
     for(t in 1:T){
       # Generate proposal
       mu.cond <- -1/Q[t,t] * Q[t, 1:T != t] %*% (tau.mat[i, 1:T != t])
-      Q.cond <-  1/sigma.vec[i] * Q[t,t]
+      Q.cond <-  1/sigma.vec[i-1] * Q[t,t]
       tau.prop <- rnorm(1, mean = mu.cond, sd = sqrt(1/Q.cond))
       
       # Calculate acceptance probability
@@ -130,6 +128,8 @@ mcmc.single <- function(num.iter, sigma0, tau0){
         count <- count + 1
       }
     }
+    # Generate Gibbs sample for sigma2
+    sigma.vec[i] <- sample.sigma2(tau.mat[i, ])
   }
   return(list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec))
 }
@@ -148,7 +148,7 @@ alpha <- 2
 beta <- 0.05
 
 # Run the MCMC
-num.iter <- 50000
+num.iter <- 1000
 set.seed(4300)
 ptm <- proc.time()
 mcmc <- mcmc.single(num.iter, sigma0 =  0.02, tau0 = rnorm(T))
@@ -301,24 +301,23 @@ mcmc.block <- function(num.iter, sigma0, tau0, M){
     
     # MH samples for tau
     idx.block <- 0
+    tau.mat[i, ] <- tau.mat[i - 1, ]
     for(j in seq(1,T,M)){
       idx.block <- idx.block + 1
       I = j:min(j+M-1, T)
       
       # Generate proposal
-      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i-1, (1:T)[-I]], ncol=1)
+      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i, (1:T)[-I]], ncol=1)
       Q.cond.inv <-  sigma.vec[i-1] * Q.AA.inv[[idx.block]]
       tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
       
       # Calculate acceptance prob.
-      accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
+      accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i, I])
       
       u <- runif(1)
       if(u < accept.prob){
         tau.mat[i, I] = tau.prop
         count <- count + 1
-      } else{
-        tau.mat[i, I] = tau.mat[i - 1, I]
       }
     }
     # Generate Gibbs sample for sigma
@@ -500,13 +499,6 @@ problem.f <- function(){
   mean(mcmc$sigma.vec)
   quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
 }
-
-
-
-
-
-
-
 
 
 
