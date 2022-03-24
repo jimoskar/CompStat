@@ -3,6 +3,7 @@ library(INLA)
 library(pals)
 library(xtable)
 
+
 load("rain.rda")
 alpha <- 2
 beta <- 0.05
