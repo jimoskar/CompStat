@@ -1,6 +1,7 @@
 ### Problem 1 ----
 library(ggplot2)
 library(MASS)
+library(coda)
 source('MCMC.R')
 source('sacf.R')
 
@@ -36,6 +37,7 @@ ptm <- proc.time()
 mcmc <- mcmc.single(num.iter, init.tau, init.sigma2, y, n, alpha, beta)
 elapsed.time <- (proc.time() - ptm)[3]
 
+
 # Elapsed time
 print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds."))
 # Acceptance rate
@@ -65,9 +67,9 @@ mcmc.corr <- data.frame("lag"       = 0:max.lag,
 
 
 # Traceplots, histograms, and sample autocorrelation for sigma^2
-traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
+traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
   geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-  theme_minimal()
+  ylim(0,0.05) + theme_minimal()
 traceplot.sigma
 ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
@@ -132,6 +134,7 @@ ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
 tau.idx <- c(1, 201, 366)
 pi.df <- plot.preds(mcmc$tau, plot = FALSE)
 
+
 tau.table <- data.frame(idx = tau.idx,
                         pi = pi.df$pi[tau.idx], 
                         lower = pi.df$lower[tau.idx],
@@ -143,6 +146,8 @@ sigma.q <- quantile(mcmc$sigma2, probs = c(0.025, 0.975))
 sigma.table = c(pred = mean(mcmc$sigma2), lower = sigma.q[1], upper = sigma.q[2])
 print(sigma.table)
 
+# Estimated ESS
+effectiveSize(as.mcmc(mcmc.data))
 
 
 ## f) ----
@@ -195,9 +200,9 @@ mcmc.corr <- data.frame("lag"       = 0:max.lag,
 )
 
 # Traceplots, histograms, and sample autocorrelation for sigma^2
-traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
-  geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-  theme_minimal()
+traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
+  geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) + 
+  ylim(0, 0.05) + theme_minimal()
 traceplot.sigma
 ggsave("./figures/traceplot_sigma2_block.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
@@ -274,68 +279,43 @@ sigma.table = c(pred = mean(mcmc$sigma2), lower = sigma.q[1], upper = sigma.q[2]
 print(sigma.table)  
 
 
+### Estimate computation time/acceptance rate as function of M
+Ms               <- 1:100
+elapsed.times    <- numeric(100)
+acceptance.rates <- numeric(100)
 
-problem1f <- function(){
-  # Estimate computation time/acceptance rate as function of M
-  Ms               <- 1:100
-  elapsed.times    <- numeric(100)
-  acceptance.rates <- numeric(100)
+for(M in Ms){
+  # Run MCMC
+  num.iter <- 1000
+  set.seed(4300)
+  ptm <- proc.time()
+  mcmc <- mcmc.block(num.iter, init.tau, init.sigma2, y, n, M, alpha, beta)
+  elapsed.time <- (proc.time() - ptm)[3]
+  print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
+  ?runif
+  # Calculate acceptance rate
+  print(paste("The acceptance rate for M=", M, "is", round(mcmc$acceptance.rate,8) ))
   
-  for(M in Ms){
-    # Run MCMC
-    num.iter <- 1000
-    set.seed(4300)
-    ptm <- proc.time()
-    mcmc <- mcmc.block(num.iter, init.tau, init.sigma2, y, n, M, alpha, beta)
-    elapsed.time <- (proc.time() - ptm)[3]
-    print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
-    ?runif
-    # Calculate acceptance rate
-    print(paste("The acceptance rate for M=", M, "is", round(mcmc$acceptance.rate,8) ))
-    
-    elapsed.times[M] <- elapsed.time
-    acceptance.rates[M] <- mcmc$acceptance.rate
-  }
-  
-  data.M <- data.frame("M" = Ms,
-                       "elapsed.times" = elapsed.times,
-                       "acceptance.rates" = acceptance.rates)
-  
-  plot(elapsed.times, type='l')
-  plot(acceptance.rates, type='l')
-  
-  elapsed.times.plot <- ggplot(data.M, aes(x=M, y=elapsed.times)) + 
-    geom_line() + xlab("Block size M") + ylab("Computation time [seconds]") +
-    theme_minimal()
-  elapsed.times.plot
-  ggsave("./figures/elapsed.times.plot.pdf", plot = elapsed.times.plot, height = 2.5, width = 5.0)
-  
-  acceptance.rates.plot <- ggplot(data.M, aes(x=M, y=acceptance.rates)) + 
-    geom_line() + xlab("Block size M") + ylab("Acceptance rates") +
-    theme_minimal()
-  acceptance.rates.plot
-  ggsave("./figures/acceptance.rates.plot.pdf", plot = acceptance.rates.plot, height = 2.5, width = 5.0)
-  
-  
-  # plot relative number of accepted values per calculation time
-  rel.acceptance.rate.per.time <- ceiling(T/Ms)/T * acceptance.rates / elapsed.times
-  rel.acceptance.rate.per.time <- rel.acceptance.rate.per.time / max(rel.acceptance.rate.per.time)
-  
-  plot(rel.acceptance.rate.per.time, type='l')
-  
-  # Plot predictions of pi
-  plot.preds(mcmc$tau.mat)
-  
-  # Calculate statistics for 1, 201, 366 and sigma
-  tau.idx <- c(1, 201, 366)
-  pi.df <- plot.preds(mcmc$tau.mat, plot = FALSE)
-  
-  tau.table <- data.frame(idx   = tau.idx,
-                          pi    = pi.df$pi[tau.idx], 
-                          lower = pi.df$lower[tau.idx],
-                          upper = pi.df$upper[tau.idx])
-  tau.table
-  
-  mean(mcmc$sigma.vec)
-  quantile(mcmc$sigma.vec, probs = c(0.025, 0.975))
+  elapsed.times[M] <- elapsed.time
+  acceptance.rates[M] <- mcmc$acceptance.rate
 }
+
+data.M <- data.frame("M" = Ms,
+                     "elapsed.times" = elapsed.times,
+                     "acceptance.rates" = acceptance.rates)
+
+plot(elapsed.times, type='l')
+plot(acceptance.rates, type='l')
+
+elapsed.times.plot <- ggplot(data.M, aes(x=M, y=elapsed.times)) + 
+  geom_line() + xlab("Block size M") + ylab("Computation time [seconds]") +
+  theme_minimal()
+elapsed.times.plot
+ggsave("./figures/elapsed.times.plot.pdf", plot = elapsed.times.plot, height = 2.5, width = 5.0)
+
+acceptance.rates.plot <- ggplot(data.M, aes(x=M, y=acceptance.rates)) + 
+  geom_line() + xlab("Block size M") + ylab("Acceptance rates") +
+  theme_minimal()
+acceptance.rates.plot
+ggsave("./figures/acceptance.rates.plot.pdf", plot = acceptance.rates.plot, height = 2.5, width = 5.0)
+

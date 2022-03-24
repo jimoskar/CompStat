@@ -3,7 +3,6 @@ library(INLA)
 library(pals)
 library(xtable)
 
-
 load("rain.rda")
 alpha <- 2
 beta <- 0.05
@@ -34,11 +33,14 @@ pi.preds <- ggplot(pi.df, aes(x = x)) + geom_line(aes(y = pi, color = "pi")) +
   xlab("Day in year, t") + ylab(expression(pi)) +
   scale_color_manual(name = " ", values = c("yt/nt" = "blue", "INLA-predictions" = "black"),
                      labels = c(expression(y[t]/n[t]),"INLA-predictions")) + theme_minimal()
-
 ggsave("./figures/pi_preds_inla.pdf", plot = pi.preds, height = 4.0, width = 8.0)
 
+# Values for table
+pi.table <- mod$summary.random$day[c(1, 201, 366), c(2,4,6)]
+sigm(pi.table)
+sigma.table <- mod$summary.hyperpar[,c(1,4,5)]
+1/sigma.table
 
-plot(inla.smarginal(mod$marginals.hyperpar$`Precision for day`), type = "l")
 
 # Plot marginals
 plot(inla.smarginal(mod$marginals.random$day$index.201), type = "l")
