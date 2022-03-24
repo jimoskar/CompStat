@@ -1,8 +1,6 @@
-mcmc.fast <- function(num.iterations, initial.tau, initial.sigma2){
-  # Initialize
+mcmc <- function(num.iterations, initial.tau, initial.sigma2){
+  ### Initialization
   T            <- length(initial.tau)
-  n            <- rain$n.years
-  y            <- rain$n.rain
   tau          <- matrix(NA, nrow = (num.iterations+1), ncol = T)
   tau[1, ]     <- initial.tau
   sigma2       <- c(initial.sigma2, rep(NA, num.iterations))
@@ -10,72 +8,66 @@ mcmc.fast <- function(num.iterations, initial.tau, initial.sigma2){
   alpha.star   <- 2.00 + (T-1)/2
   beta         <- 0.05
   root2        <- sqrt(2)
-
+  
+  ### Iterations
   for(i in 2:(num.iterations+1)){
-    # Metropolis-Hastings steps
+    
+    ### Metropolis-Hastings steps for tau
     tau[i, ] <- tau[i-1, ]
-    
-    # Pre-compute probabilities
+    # Precompute probabilities
     U <- runif(T)
-    Z.sigma <- rnorm(T, mean=0, sd=sqrt(sigma2[i-1]))
-    
-    ## t = 1
+    Z.sigma <- sqrt(sigma2[i-1]) * rnorm(T)
+    # t = 1
     tau.proposal <- tau[i,2] + Z.sigma[1]
     tau.current  <- tau[i,1]
-    log.acc <- y[1]*(tau.proposal - tau.current) + n[1]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
-    if( U[1] < exp(log.acc) ){
+    log.acceptance <- y[1]*(tau.proposal - tau.current) +
+      n[1]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+    if( U[1] < exp(log.acceptance) ){
       tau[i,1] = tau.proposal
       num.accepted <- num.accepted+1
     }
-    
-    ## t = 2:T-1
+    # t = 2:T-1
     for(t in 2:(T-1)){
       tau.proposal <- (tau[i,t-1] + tau[i,t+1])/2 + Z.sigma[t]/root2
       tau.current  <- tau[i,t]
-      log.acc <- y[t]*(tau.proposal - tau.current) + n[t]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
-      if( U[t] < exp(log.acc) ){
+      log.acceptance <- y[t]*(tau.proposal - tau.current) +
+        n[t]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+      if( U[t] < exp(log.acceptance) ){
         tau[i, t] = tau.proposal
         num.accepted <- num.accepted+1
       }
     }
-    ## t = T
+    # t = T
     tau.proposal <- tau[i,T-1] + Z.sigma[T]
     tau.current  <- tau[i,T]
-    log.acc <- y[T]*(tau.proposal - tau.current) + n[T]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
-    if(U[T] < exp(log.acc) ){
+    log.acceptance <- y[T]*(tau.proposal - tau.current) +
+      n[T]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+    if(U[T] < exp(log.acceptance) ){
       tau[i, T] = tau.proposal
       num.accepted <- num.accepted+1
     }
-    ## Gibbs step
+    
+    ### Gibbs step for sigma^2
     sigma2[i] <- 1/rgamma(1, shape = alpha.star, rate = 0.5*sum(diff(tau[i,])^2) + beta)
   }
+  
+  ### Return tau, sigma^2 and acceptance rates for tau
   list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.iterations*T))
 }
 
 
-library(profvis)
 load("rain.rda")
 
 y <- rain$n.rain
 n <- rain$n.years
 T <- length(y)
-num.iter <- 5000
+num.iter <- 50000
 set.seed(4300)
 init.tau    <- runif(T,-3,0)
 init.sigma2 <- 0.01
 
-profvis( mcmc.fast(num.iter, init.tau, init.sigma2) )
-# 198900 ms
-# 65200 ms
-# 64400 ms
-# 39300 ms
-# 28550 ms
-# 26730 ms
-# 24780 ms
-# 21370 ms
-# 19730 ms
-# 18570 ms
-# Code is now 10 times faster :)
+#library(profvis)
+#profvis( mcmc(num.iter, init.tau, init.sigma2) )
 
 mcmc <- mcmc.fast(num.iter, init.tau, init.sigma2)
 

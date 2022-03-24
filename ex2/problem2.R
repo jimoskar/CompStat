@@ -1,7 +1,6 @@
 ### Problem 2 ----
 library(INLA)
 library(pals)
-
 load("rain.rda")
 alpha <- 2
 beta <- 0.05
