@@ -1,6 +1,7 @@
 ### Problem 1 ----
 library(ggplot2)
 library(MASS)
+library(coda)
 source('MCMC.R')
 source('sacf.R')
 
@@ -35,6 +36,7 @@ init.sigma2 <- 0.01
 ptm <- proc.time()
 mcmc <- mcmc.single(num.iter, init.tau, init.sigma2, y, n, alpha, beta)
 elapsed.time <- (proc.time() - ptm)[3]
+
 
 # Elapsed time
 print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds."))
@@ -81,6 +83,7 @@ correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) +
   geom_hline(aes(yintercept = 0)) +
   geom_segment(mapping = aes(xend = lag, yend = 0)) +
   xlab("Lag") + ylab("Correlation") + theme_minimal()
+correlation.sigma
 ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
 
 
@@ -132,6 +135,7 @@ ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
 tau.idx <- c(1, 201, 366)
 pi.df <- plot.preds(mcmc$tau, plot = FALSE)
 
+
 tau.table <- data.frame(idx = tau.idx,
                         pi = pi.df$pi[tau.idx], 
                         lower = pi.df$lower[tau.idx],
@@ -143,6 +147,8 @@ sigma.q <- quantile(mcmc$sigma2, probs = c(0.025, 0.975))
 sigma.table = c(pred = mean(mcmc$sigma2), lower = sigma.q[1], upper = sigma.q[2])
 print(sigma.table)
 
+# Estimated ESS
+effectiveSize(as.mcmc(mcmc.data))
 
 ## f) ----
 
