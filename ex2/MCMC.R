@@ -1,9 +1,7 @@
 ### Problem 1 ----
 
-# logit function
-logit <- function(x){
-  return(x/(1 - x))
-}
+library(pracma)
+
 
 # sigmoid / expit function
 sigm <- function(tau){
@@ -114,6 +112,101 @@ mcmc.single <- function(num.iterations, initial.tau, initial.sigma2, y, n, alpha
   
   ### Return tau, sigma^2 and acceptance rates for tau
   list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.iterations*T))
+}
+
+
+# Returns a 2D array of (start, end) indecies for each block
+get.indecies <- function(T, M){
+  num.blocks <- ceiling(T/M)
+  indecies <- matrix(c(seq(1, T, M), seq(M, T+M-1, M)), nrow=num.blocks, ncol=2 )
+  indecies[num.blocks, 2] <- T
+  return(indecies)
+}
+
+mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alpha=2.00, beta=0.05){
+  if(M==1) return( mcmc.single(num.iterations, initial.tau, initial.sigma2, y, n, alpha=2.00, beta=0.05) )
+  
+  ### Initialization
+  T            <- length(initial.tau)
+  tau          <- matrix(NA, nrow = (num.iterations+1), ncol = T)
+  tau[1, ]     <- initial.tau
+  sigma2       <- c(initial.sigma2, rep(NA, num.iterations))
+  num.accepted <- 0
+  alpha.star   <- alpha + (T-1)/2
+  root2        <- sqrt(2)
+  
+  
+  ### Precomputing (assuming M < T)
+  indecies <- get.indecies(T,M)
+  num.blocks <- dim(indecies)[1]
+  M.last <- T - indecies[num.blocks,1]+1
+    
+  # Create Q matrix
+  Q <- diag(c(1, rep(2,T-2),1))
+  Q[abs(row(Q) - col(Q))==1] <- -1
+  
+  
+  # Q.AA for the three different blocks
+  Q.AA.inv1 <- solve( Q[1:M, 1:M] )
+  Q.AA.inv2 <- solve( Q[2:(M+1), 2:(M+1)] )
+  Q.AA.inv3 <- solve( Q[indecies[num.blocks,1]:T, indecies[num.blocks,1]:T] )
+
+  
+  ### Iterations
+  for(i in 2:(num.iter+1)){
+    
+    ### Metropolis-Hastings steps for tau
+    tau[i, ] <- tau[i-1, ]
+    sigma2[i] <- sigma2[i-1]
+    Q.AA.inv1.sigma2 <- sigma2[i]*Q.AA.inv1
+    Q.AA.inv2.sigma2 <- sigma2[i]*Q.AA.inv2
+    Q.AA.inv3.sigma2 <- sigma2[i]*Q.AA.inv3
+    
+    # precompute probabilities
+    U <- runif(num.blocks)
+    
+    # I = (1:M)
+    I = 1:M
+    tau.proposal <- mvrnorm(1, mu=rep(tau[i,M+1],M), Sigma=Q.AA.inv1.sigma2)
+    tau.current  <- tau[i,I]
+    log.acceptance <- y[I]*(tau.proposal - tau.current) +
+      n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+    if( U[1] < exp(sum(log.acceptance)) ){
+      tau[i,I] = tau.proposal
+      num.accepted <- num.accepted+1
+    }
+    # I = (M+1:2M), ...
+    for(j in 2:(num.blocks-1)){
+      
+      a <- indecies[j,1]
+      b <- indecies[j,2]
+      I = a:b
+      tau.proposal <- mvrnorm(1, mu=linspace(tau[i,a-1], tau[i,b+1], M+2)[2:(M+1)], Sigma=Q.AA.inv2.sigma2)
+      tau.current  <- tau[i,I]
+      log.acceptance <- y[I]*(tau.proposal - tau.current) +
+        n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+      if( U[j] < exp(sum(log.acceptance)) ){
+        tau[i,I] = tau.proposal
+        num.accepted <- num.accepted+1
+      }
+    }
+    # I = ((T-M.last+1):T)
+    I = indecies[num.blocks,1]:T
+    tau.proposal <- mvrnorm(1, mu=rep(tau[i,T-M], M.last), Sigma=Q.AA.inv3.sigma2)
+    tau.current  <- tau[i,I]
+    log.acceptance <- y[I]*(tau.proposal - tau.current) +
+      n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
+    if( U[num.blocks] < exp(sum(log.acceptance)) ){
+      tau[i,I] = tau.proposal
+      num.accepted <- num.accepted+1
+    }
+    
+    ### Gibbs step for sigma^2
+    sigma2[i] <- 1/rgamma(1, shape = alpha.star, rate = 0.5*sum(diff(tau[i,])^2) + beta)
+  }
+  
+  ### Return tau, sigma^2 and acceptance rates for tau
+  list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.blocks*num.iterations))
 }
 
 
