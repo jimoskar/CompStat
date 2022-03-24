@@ -67,9 +67,9 @@ mcmc.corr <- data.frame("lag"       = 0:max.lag,
 
 
 # Traceplots, histograms, and sample autocorrelation for sigma^2
-traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
+traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
   geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-  theme_minimal()
+  ylim(0,0.05) + theme_minimal()
 traceplot.sigma
 ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
@@ -201,11 +201,11 @@ mcmc.corr <- data.frame("lag"       = 0:max.lag,
 )
 
 # Traceplots, histograms, and sample autocorrelation for sigma^2
-traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
-  geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-  theme_minimal()
+traceplot.sigma <- ggplot(mcmc.data.all, aes(x=x,y=sigma.vec)) + 
+  geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) + 
+  ylim(0, 0.05) + theme_minimal()
 traceplot.sigma
-ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
+ggsave("./figures/traceplot_sigma2_block.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
 histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
   geom_histogram(binwidth=0.001) + xlab(expression(sigma[u]^2)) + ylab("Count") +
