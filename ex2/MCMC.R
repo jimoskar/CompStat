@@ -140,7 +140,7 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
   indecies <- get.indecies(T,M)
   num.blocks <- dim(indecies)[1]
   M.last <- T - indecies[num.blocks,1]+1
-    
+  
   # Create Q matrix
   Q <- diag(c(1, rep(2,T-2),1))
   Q[abs(row(Q) - col(Q))==1] <- -1
@@ -173,7 +173,7 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
       n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
     if( U[1] < exp(sum(log.acceptance)) ){
       tau[i,I] = tau.proposal
-      num.accepted <- num.accepted+1
+      num.accepted <- num.accepted+M
     }
     # I = (M+1:2M), ...
     for(j in 2:(num.blocks-1)){
@@ -187,7 +187,7 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
         n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
       if( U[j] < exp(sum(log.acceptance)) ){
         tau[i,I] = tau.proposal
-        num.accepted <- num.accepted+1
+        num.accepted <- num.accepted+M
       }
     }
     # I = ((T-M.last+1):T)
@@ -198,7 +198,7 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
       n[I]*log( (1+exp(tau.current))/(1+exp(tau.proposal)) )
     if( U[num.blocks] < exp(sum(log.acceptance)) ){
       tau[i,I] = tau.proposal
-      num.accepted <- num.accepted+1
+      num.accepted <- num.accepted+M.last
     }
     
     ### Gibbs step for sigma^2
@@ -206,12 +206,91 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
   }
   
   ### Return tau, sigma^2 and acceptance rates for tau
-  list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.blocks*num.iterations))
+  list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.iterations*T))
+}
+
+
+mcmc.block.old <- function(num.iterations, initial.tau, initial.sigma2, y, n, M){
+  if(M==1) return( mcmc.iterative(num.iter, sigma0, tau0) )
+  
+  tau.mat      <- matrix(NA, nrow = num.iterations, ncol = T)
+  tau.mat[1, ] <- initial.tau
+  sigma.vec    <- rep(NA, num.iterations)
+  sigma.vec[1] <- initial.sigma2
+  count        <- 0 # Count of accepted tau-samples
+  alpha.vec    <- rep(NA, num.iterations - 1)
+  n.blocks     <- ceiling(T/M) # Total number of blocks in one iteration
+  n.blocks.mid <- ceiling(T/M)-2
+  M.last       <- T-(ceiling(T/M)-1)*M
+  
+  
+  # Precomputing (assuming M < T)
+  # Q.AA for the three different blocks
+  Q.AA <- list( Q[1:M, 1:M], Q[2:(M+1), 2:(M+1)], Q[(T-M.last+1):T, (T-M.last+1):T] )
+  # Inverse of Q.AA for all blocks
+  Q.AA.inv <- list( solve(Q.AA[[1]]) )
+  if(n.blocks.mid){
+    Q.AA.inv2 <- solve(Q.AA[[2]])
+    for(n in 1:n.blocks.mid){
+      Q.AA.inv <- append( Q.AA.inv, list(Q.AA.inv2) )
+    }  
+  } 
+  Q.AA.inv <- append( Q.AA.inv, list(solve(Q.AA[[3]])) )
+  # Q.AB for all blocks
+  Q.AB <- list(Q[1:M, (M+1):T])
+  if(n.blocks.mid){
+    for(n in 1:n.blocks.mid){
+      I <- (M*n + 1):(M*(n+1))
+      Q.AB <- append( Q.AB, list(Q[I, (1:T)[-I]]) )
+    }   
+  }
+  Q.AB <- append( Q.AB, list(Q[(T-M.last+1):T, 1:(T-M.last)]) )
+  # S = -inv(Q.AA) * Q.AB for all blocks
+  S <- list()
+  for(n in 1:n.blocks){
+    S <- append( S, list(Q.AA.inv[[n]] %*% Q.AB[[n]]) )
+  }
+  
+  # Iterations
+  for(i in 2:num.iterations){
+    
+    # MH samples for tau
+    idx.block <- 0
+    for(j in seq(1,T,M)){
+      idx.block <- idx.block + 1
+      I = j:min(j+M-1, T)
+      
+      # Generate proposal
+      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i-1, (1:T)[-I]], ncol=1)
+      Q.cond.inv <-  sigma.vec[i-1] * Q.AA.inv[[idx.block]]
+      tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
+      
+      # Calculate acceptance prob.
+      accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
+      
+      u <- runif(1)
+      if(u < accept.prob){
+        tau.mat[i, I] = tau.prop
+        count <- count + 1
+      } else{
+        tau.mat[i, I] = tau.mat[i - 1, I]
+      }
+    }
+    # Generate Gibbs sample for sigma
+    tQt <- sum(diff(tau.mat[i, ])^2)
+    shape <- alpha + (T-1)/2
+    scale <- 0.5*tQt + beta
+    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
+  }
+  
+  return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
 }
 
 
 
+# Code for checking computation times with profvis.
 if(0){
+  library(profvis)
   load("rain.rda")
   
   y <- rain$n.rain
@@ -221,92 +300,14 @@ if(0){
   set.seed(4300)
   init.tau    <- runif(T,-3,0)
   init.sigma2 <- 0.01
+  Q <- diag(c(1, rep(2,T-2),1))
+  Q[abs(row(Q) - col(Q))==1] <- -1
+  M <- 10
   
-  #library(profvis)
-  #profvis( mcmc(num.iter, init.tau, init.sigma2) )
-  
-  mcmc <- mcmc.single(num.iter, init.tau, init.sigma2)
-  
-  # Acceptance rate
-  print(paste("The acceptance rate is", round(mcmc$acceptance.rate,8) ))
-  
-  ## Traceplots, histograms, and sample autocorrelation functions
-  mcmc.data.all <- data.frame("x"         = 1:(num.iter+1),
-                              "sigma.vec" = mcmc$sigma2,
-                              "pi_1"     = sigm(mcmc$tau[,1]),
-                              "pi_201"   = sigm(mcmc$tau[,201]),
-                              "pi_366"   = sigm(mcmc$tau[,366])
-  )
-  
-  burn.in = 50
-  if(burn.in){
-    mcmc.data <- mcmc.data.all[-(1:burn.in),]
-  } else{
-    mcmc.data <- mcmc.data.all
-  }
-  
-  max.lag <- 50
-  mcmc.corr <- data.frame("lag"       = 0:max.lag,
-                          "sigma.vec" = sacf(mcmc$sigma2)$rho.hat,
-                          "pi_1"     = sacf(sigm(mcmc$tau[,1]))$rho.hat,
-                          "pi_201"   = sacf(sigm(mcmc$tau[,201]))$rho.hat,
-                          "pi_366"   = sacf(sigm(mcmc$tau[,366]))$rho.hat
-  )
-  
-  # Traceplots, histograms, and sample autocorrelation for sigma^2
-  traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) + 
-    geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
-    theme_minimal()
-  traceplot.sigma
-  ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
-  
-  histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-    geom_histogram(binwidth=0.0005) + xlab(expression(sigma[u]^2)) + ylab("Count") +
-    theme_minimal()
-  histogram.sigma
-  ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
-  
-  correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) + 
-    geom_line() + xlab("Iteration lag") + ylab("Autocorrelation") +
-    theme_minimal()
-  correlation.sigma
-  ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
-  
-  
-  # pi_1, pi_201, pi_366
-  traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
-    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.4) +
-    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.4) +
-    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.4) +
-    scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
-                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab("Iterations") + ylab(" ") + theme_minimal()
-  traceplot.tau
-  ggsave("./figures/traceplot_tau.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
-  
-  histogram.tau <- ggplot(mcmc.data) + 
-    geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.005, alpha=0.6) + 
-    geom_histogram(aes(x=pi_201, fill="tau_201"), binwidth=0.005, alpha=0.6) + 
-    geom_histogram(aes(x=pi_366, fill="tau_366"), binwidth=0.005, alpha=0.6) + 
-    scale_fill_manual(name = " ", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
-                      labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab(" ") + ylab("Count") + theme_minimal()
-  histogram.tau
-  ggsave("./figures/histogram_tau.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
-  
-  correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
-    geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
-    geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
-    geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
-    scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
-                       labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-    xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
-  correlation.tau
-  ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
-  
-  
-  # Plot predictions of pi
-  pi.preds <- plot.preds(mcmc$tau)
-  pi.preds
-  ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
+  profvis( mcmc.single(num.iter, init.tau, init.sigma2, y, n) ) # 3 sec
+  #profvis( mcmc.block(num.iter, init.tau, init.sigma2, y, n, M) ) # 36 sec
+  #rofvis( mcmc.block.old(num.iter, init.tau, init.sigma2, y, n, M) ) # 41 sec
 }
+
+
+

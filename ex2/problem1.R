@@ -72,26 +72,25 @@ traceplot.sigma
 ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
 histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-  geom_histogram(binwidth=0.001) + xlab(expression(sigma[u]^2)) + ylab("Count") +
+  geom_histogram(binwidth=0.0005) + xlab(expression(sigma[u]^2)) + ylab("Count") +
   theme_minimal()
 histogram.sigma
 ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
 
 correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) + 
   geom_hline(aes(yintercept = 0)) +
-  geom_segment(mapping = aes(xend = lag, yend = 0)) +
+  geom_segment(mapping = aes(xend = lag, yend = 0)) + geom_point(size=0.3) +
   xlab("Lag") + ylab("Correlation") + theme_minimal()
 correlation.sigma
 ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
 
 
 # pi_1, pi_201, pi_366
-traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
+traceplot.tau <- ggplot(mcmc.data.all, aes(x=x)) +
   geom_line(aes(y=pi_1, colour="tau_1"),size=0.25, alpha=0.4) +
   geom_line(aes(y=pi_201, colour="tau_201"),size=0.25, alpha=0.4) +
   geom_line(aes(y=pi_366, colour="tau_366"),size=0.25, alpha=0.4) +
   scale_color_manual(name="", values=c("tau_1"="red", "tau_201"="blue", "tau_366"="green"),
-                     
                       l= expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
   xlab("Iterations") + ylab(" ") + theme_minimal()
 traceplot.tau
@@ -118,7 +117,7 @@ correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) +
   xlab("Lag") + ylab("Correlation") +
   scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
                      label = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-  xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
+  xlab("Lag") + ylab("Autcorrelation") + theme_minimal()
 correlation.tau
 ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
 
@@ -180,7 +179,7 @@ mcmc.data.all <- data.frame("x"         = 1:(num.iter+1),
                             "pi_366"   = sigm(mcmc$tau[,366])
 )
 
-burn.in = 50
+burn.in = 500
 if(burn.in){
   mcmc.data <- mcmc.data.all[-(1:burn.in),]
 } else{
@@ -200,19 +199,20 @@ traceplot.sigma <- ggplot(mcmc.data, aes(x=x,y=sigma.vec)) +
   geom_line() + xlab("Iterations") + ylab(expression(sigma[u]^2)) +
   theme_minimal()
 traceplot.sigma
-ggsave("./figures/traceplot_sigma2.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
+ggsave("./figures/traceplot_sigma2_block.pdf", plot = traceplot.sigma, height = 4.0, width = 8.0)
 
 histogram.sigma <- ggplot(mcmc.data, aes(x=sigma.vec)) + 
-  geom_histogram(binwidth=0.001) + xlab(expression(sigma[u]^2)) + ylab("Count") +
+  geom_histogram(binwidth=0.0005) + xlab(expression(sigma[u]^2)) + ylab("Count") +
   theme_minimal()
 histogram.sigma
-ggsave("./figures/histogram_sigma2.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
+ggsave("./figures/histogram_sigma2_block.pdf", plot = histogram.sigma, height = 4.0, width = 8.0)
 
 correlation.sigma <- ggplot(mcmc.corr, aes(x=lag, y=sigma.vec)) + 
-  geom_line() + xlab("Iteration lag") + ylab("Autocorrelation") +
-  theme_minimal()
+  geom_hline(aes(yintercept = 0)) +
+  geom_segment(mapping = aes(xend = lag, yend = 0)) + geom_point(size=0.3) +
+  xlab("Lag") + ylab("Correlation") + theme_minimal()
 correlation.sigma
-ggsave("./figures/correlation_sigma2.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
+ggsave("./figures/correlation_sigma2_block.pdf", plot = correlation.sigma, height = 4.0, width = 8.0)
 
 
 # pi_1, pi_201, pi_366
@@ -224,7 +224,7 @@ traceplot.tau <- ggplot(mcmc.data, aes(x=x)) +
                      labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
   xlab("Iterations") + ylab(" ") + theme_minimal()
 traceplot.tau
-ggsave("./figures/traceplot_tau.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
+ggsave("./figures/traceplot_tau_block.pdf", plot = traceplot.tau, height = 4.0, width = 8.0)
 
 histogram.tau <- ggplot(mcmc.data) + 
   geom_histogram(aes(x=pi_1, fill="tau_1"), binwidth=0.005, alpha=0.6) + 
@@ -234,23 +234,28 @@ histogram.tau <- ggplot(mcmc.data) +
                     labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
   xlab(" ") + ylab("Count") + theme_minimal()
 histogram.tau
-ggsave("./figures/histogram_tau.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
+ggsave("./figures/histogram_tau_block.pdf", plot = histogram.tau, height = 4.0, width = 8.0)
 
 correlation.tau <- ggplot(mcmc.corr, aes(x=lag)) + 
-  geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) +
+  geom_hline(aes(yintercept = 0)) +
+  geom_line(aes(y=pi_1, colour="tau_1"),size=0.25) + 
+  geom_point(aes(y=pi_1, colour="tau_1"), size =0.3) + 
   geom_line(aes(y=pi_201, colour="tau_201"),size=0.25) +
+  geom_point(aes(y=pi_201, colour="tau_201"), size =0.3) +
   geom_line(aes(y=pi_366, colour="tau_366"),size=0.25) +
+  geom_point(aes(y=pi_366, colour="tau_366"), size =0.3) + 
+  xlab("Lag") + ylab("Correlation") +
   scale_color_manual(name = "", values = c("tau_1" = "red", "tau_201" = "blue", "tau_366" = "green"),
-                     labels = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
-  xlab("Iteration lag") + ylab("Autcorrelation") + theme_minimal()
+                     label = expression(pi(tau[1]),pi(tau[201]),pi(tau[366]))) +
+  xlab("Lag") + ylab("Autcorrelation") + theme_minimal()
 correlation.tau
-ggsave("./figures/correlation_tau.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
+ggsave("./figures/correlation_tau_block.pdf", plot = correlation.tau, height = 4.0, width = 8.0)
 
 
 # Plot predictions of pi
 pi.preds <- plot.preds(mcmc$tau)
 pi.preds
-ggsave("./figures/pi_preds.pdf", plot = pi.preds, height = 4.0, width = 8.0)
+ggsave("./figures/pi_preds_block.pdf", plot = pi.preds, height = 4.0, width = 8.0)
 
 
 ### Calculate statistics for tau_1, tau_201, tau_366 and sigma
@@ -281,16 +286,15 @@ problem1f <- function(){
     num.iter <- 1000
     set.seed(4300)
     ptm <- proc.time()
-    mcmc <- mcmc.block(num.iter, sigma0 =  0.02, tau0 = runif(T, min=-3, max=0), M = M)
+    mcmc <- mcmc.block(num.iter, init.tau, init.sigma2, y, n, M, alpha, beta)
     elapsed.time <- (proc.time() - ptm)[3]
     print(paste("Time elapsed for", num.iter, "iterations is", round(elapsed.time,8), "seconds." ))
     ?runif
     # Calculate acceptance rate
-    acceptance.rate <- mcmc$count/((num.iter-1) * ceiling(T/M))
-    print(paste("The acceptance rate for M=", M, "is", round(acceptance.rate,8) ))
+    print(paste("The acceptance rate for M=", M, "is", round(mcmc$acceptance.rate,8) ))
     
     elapsed.times[M] <- elapsed.time
-    acceptance.rates[M] <- acceptance.rate
+    acceptance.rates[M] <- mcmc$acceptance.rate
   }
   
   data.M <- data.frame("M" = Ms,
