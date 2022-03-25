@@ -278,6 +278,8 @@ sigma.q <- quantile(mcmc$sigma2, probs = c(0.025, 0.975))
 sigma.table = c(pred = mean(mcmc$sigma2), lower = sigma.q[1], upper = sigma.q[2])
 print(sigma.table)  
 
+# Estimated ESS
+effectiveSize(as.mcmc(mcmc.data))
 
 ### Estimate computation time/acceptance rate as function of M
 Ms               <- 1:100

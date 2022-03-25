@@ -9,22 +9,6 @@ sigm <- function(tau){
 }
 
 
-# Function for calculating 100(1-alpha) credible intervals
-CI <- function(samples, burn = 0, alpha = 0.05, by = 1000){
-  samples <- tail(samples, length(samples) - burn) # Remove burn-in samples
-  
-  iter <- length(samples) %/% by
-  ci.mat <- data.frame(lower = rep(NA, iter), upper = rep(NA, iter), idx = rep(NA, iter))
-  for(i in 1:iter){
-    ci <- quantile(samples[1:(i*by)], probs = c(alpha/2, 1 - alpha/2))
-    ci.mat$lower[i] <- ci[1]
-    ci.mat$upper[i] <- ci[2]
-    ci.mat$idx[i] <- i*by
-  }
-  return(ci.mat)
-}
-
-
 # Function for plotting mcmc preds or making dataset. should maybe split up
 plot.preds <- function(tau.mat, burn = 0, alpha = 0.05, plot = TRUE){
   tau.mat <- tau.mat[burn:nrow(tau.mat), ]
@@ -208,85 +192,6 @@ mcmc.block <- function(num.iterations, initial.tau, initial.sigma2, y, n, M, alp
   ### Return tau, sigma^2 and acceptance rates for tau
   list(tau = tau, sigma2 = sigma2, acceptance.rate = num.accepted/(num.iterations*T))
 }
-
-
-mcmc.block.old <- function(num.iterations, initial.tau, initial.sigma2, y, n, M){
-  if(M==1) return( mcmc.iterative(num.iter, sigma0, tau0) )
-  
-  tau.mat      <- matrix(NA, nrow = num.iterations, ncol = T)
-  tau.mat[1, ] <- initial.tau
-  sigma.vec    <- rep(NA, num.iterations)
-  sigma.vec[1] <- initial.sigma2
-  count        <- 0 # Count of accepted tau-samples
-  alpha.vec    <- rep(NA, num.iterations - 1)
-  n.blocks     <- ceiling(T/M) # Total number of blocks in one iteration
-  n.blocks.mid <- ceiling(T/M)-2
-  M.last       <- T-(ceiling(T/M)-1)*M
-  
-  
-  # Precomputing (assuming M < T)
-  # Q.AA for the three different blocks
-  Q.AA <- list( Q[1:M, 1:M], Q[2:(M+1), 2:(M+1)], Q[(T-M.last+1):T, (T-M.last+1):T] )
-  # Inverse of Q.AA for all blocks
-  Q.AA.inv <- list( solve(Q.AA[[1]]) )
-  if(n.blocks.mid){
-    Q.AA.inv2 <- solve(Q.AA[[2]])
-    for(n in 1:n.blocks.mid){
-      Q.AA.inv <- append( Q.AA.inv, list(Q.AA.inv2) )
-    }  
-  } 
-  Q.AA.inv <- append( Q.AA.inv, list(solve(Q.AA[[3]])) )
-  # Q.AB for all blocks
-  Q.AB <- list(Q[1:M, (M+1):T])
-  if(n.blocks.mid){
-    for(n in 1:n.blocks.mid){
-      I <- (M*n + 1):(M*(n+1))
-      Q.AB <- append( Q.AB, list(Q[I, (1:T)[-I]]) )
-    }   
-  }
-  Q.AB <- append( Q.AB, list(Q[(T-M.last+1):T, 1:(T-M.last)]) )
-  # S = -inv(Q.AA) * Q.AB for all blocks
-  S <- list()
-  for(n in 1:n.blocks){
-    S <- append( S, list(Q.AA.inv[[n]] %*% Q.AB[[n]]) )
-  }
-  
-  # Iterations
-  for(i in 2:num.iterations){
-    
-    # MH samples for tau
-    idx.block <- 0
-    for(j in seq(1,T,M)){
-      idx.block <- idx.block + 1
-      I = j:min(j+M-1, T)
-      
-      # Generate proposal
-      mu.cond <- -S[[idx.block]] %*% matrix(tau.mat[i-1, (1:T)[-I]], ncol=1)
-      Q.cond.inv <-  sigma.vec[i-1] * Q.AA.inv[[idx.block]]
-      tau.prop <- mvrnorm(1, mu = mu.cond, Sigma = Q.cond.inv)
-      
-      # Calculate acceptance prob.
-      accept.prob <- acceptance.probability(I, tau.prop, tau.mat[i-1, I])
-      
-      u <- runif(1)
-      if(u < accept.prob){
-        tau.mat[i, I] = tau.prop
-        count <- count + 1
-      } else{
-        tau.mat[i, I] = tau.mat[i - 1, I]
-      }
-    }
-    # Generate Gibbs sample for sigma
-    tQt <- sum(diff(tau.mat[i, ])^2)
-    shape <- alpha + (T-1)/2
-    scale <- 0.5*tQt + beta
-    sigma.vec[i] <- 1/rgamma(1, shape = shape, rate = scale)
-  }
-  
-  return( list(tau.mat = tau.mat, sigma.vec = sigma.vec, count = count, alpha = alpha.vec) )
-}
-
-
 
 # Code for checking computation times with profvis.
 if(0){
