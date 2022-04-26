@@ -28,12 +28,12 @@ ARp.beta.bootstrap <- function(x, p, B){
     # Resample residuals and x
     resample.resid.LS <- sample(resid.LS, replace = TRUE)
     resample.resid.LA <- sample(resid.LA, replace = TRUE)
-    resample.x.LS <- ARp.filter(x0, beta$LS, resample.resid.LS)
-    resample.x.LA <- ARp.filter(x0, beta$LA, resample.resid.LA)
+    bootstrap.x.LS <- ARp.filter(x0, beta$LS, resample.resid.LS)
+    bootstrap.x.LA <- ARp.filter(x0, beta$LA, resample.resid.LA)
     
     # Store new estimates for beta
-    betas.LS[b,] <- ARp.beta.est(resample.x.LS, p)$LS
-    betas.LA[b,] <- ARp.beta.est(resample.x.LA, p)$LA
+    betas.LS[b,] <- ARp.beta.est(bootstrap.x.LS, p)$LS
+    betas.LA[b,] <- ARp.beta.est(bootstrap.x.LA, p)$LA
   }
   return(list(LS=betas.LS, LA=betas.LA))
 }
@@ -49,7 +49,7 @@ ts <- ggplot(data.frame(x=1:100, y=x), aes(x=x, y=y)) +
 ggsave("./figures/x.pdf", plot = ts, width = 4, height = 2)
 
 
-B <- 2000
+B <- 10000
 set.seed(4200)
 betas <- ARp.beta.bootstrap(x, p, B)
 
@@ -72,6 +72,7 @@ ARp.pred.bootstrap <- function(x, p, B){
   
   # Find the residuals
   resid.LS <- ARp.resid(x, beta$LS)
+  print(length(resid.LS))
   resid.LA <- ARp.resid(x, beta$LA)
   
   # Initialize matrices to store the bootstrap estimates of x_{T+1}
@@ -86,27 +87,23 @@ ARp.pred.bootstrap <- function(x, p, B){
     # Resample residuals and x
     resample.resid.LS <- sample(resid.LS, replace = TRUE)
     resample.resid.LA <- sample(resid.LA, replace = TRUE)
-    resample.x.LS <- ARp.filter(x0, beta$LS, resample.resid.LS)
-    resample.x.LA <- ARp.filter(x0, beta$LA, resample.resid.LA)
+    bootstrap.x.LS <- ARp.filter(x0, beta$LS, resample.resid.LS)
+    bootstrap.x.LA <- ARp.filter(x0, beta$LA, resample.resid.LA)
     
-    # Store new estimates for residuals
-    pred.LS[b,] <- ARp.beta.est(resample.x.LS, p)$LS %*% x[(T-p+1):T] + sample(resample.resid.LS,1)
-    pred.LA[b,] <- ARp.beta.est(resample.x.LA, p)$LS %*% x[(T-p+1):T] + sample(resample.resid.LA,1)
+    # Estimate bootstrap betas
+    bootstrap.beta.LS <- ARp.beta.est(bootstrap.x.LS, p)$LS
+    bootstrap.beta.LA <- ARp.beta.est(bootstrap.x.LA, p)$LA
+    
+    # Store new estimates for x_{T+1}
+    pred.LS[b,] <- bootstrap.beta.LS %*% rev(x[(T-p+1):T]) + sample(resid.LS, 1)
+    pred.LA[b,] <- bootstrap.beta.LA %*% rev(x[(T-p+1):T]) + sample(resid.LA, 1)
   }
   return(list(LS=pred.LS, LA=pred.LA))
 }
 
-B <- 2000
+B <- 10
 set.seed(4200)
 preds <- ARp.pred.bootstrap(x, p, B)
 
 quantile(preds$LS, probs = c(0.025, 0.975))
 quantile(preds$LA, probs = c(0.025, 0.975))
-
-
-
-
-
-
-
-
