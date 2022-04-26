@@ -72,6 +72,7 @@ ARp.pred.bootstrap <- function(x, p, B){
   
   # Find the residuals
   resid.LS <- ARp.resid(x, beta$LS)
+  print(length(resid.LS))
   resid.LA <- ARp.resid(x, beta$LA)
   
   # Initialize matrices to store the bootstrap estimates of x_{T+1}
@@ -93,18 +94,14 @@ ARp.pred.bootstrap <- function(x, p, B){
     bootstrap.beta.LS <- ARp.beta.est(bootstrap.x.LS, p)$LS
     bootstrap.beta.LA <- ARp.beta.est(bootstrap.x.LA, p)$LA
     
-    # Estimate new distribution for residuals
-    bootstrap.resis.LS <- ARp.resid(bootstrap.x.LS, bootstrap.beta.LS)
-    bootstrap.resis.LA <- ARp.resid(bootstrap.x.LA, bootstrap.beta.LA)
-    
     # Store new estimates for x_{T+1}
-    pred.LS[b,] <- bootstrap.beta.LS %*% rev(x[(T-p+1):T]) + sample(bootstrap.resis.LS, 1)
-    pred.LA[b,] <- bootstrap.beta.LA %*% rev(x[(T-p+1):T]) + sample(bootstrap.resis.LA, 1)
+    pred.LS[b,] <- bootstrap.beta.LS %*% rev(x[(T-p+1):T]) + sample(resid.LS, 1)
+    pred.LA[b,] <- bootstrap.beta.LA %*% rev(x[(T-p+1):T]) + sample(resid.LA, 1)
   }
   return(list(LS=pred.LS, LA=pred.LA))
 }
 
-B <- 10000
+B <- 10
 set.seed(4200)
 preds <- ARp.pred.bootstrap(x, p, B)
 
