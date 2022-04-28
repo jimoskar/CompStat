@@ -21,8 +21,7 @@ Fval <- s$fstatistic[1]
 
 permTest <- function(){
   df.perm <- data.frame(bilirubin)
-  df.perm$pers <- sample(bilirubin$pers, size = nrow(bilirubin), 
-                         replace = FALSE)
+  df.perm$pers <- sample(bilirubin$pers, replace = FALSE)
   mod <- lm(log(meas) ~ pers, data = df.perm)
   s <- summary(mod)
   return(s$fstatistic[1])

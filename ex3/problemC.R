@@ -88,28 +88,31 @@ cor(lambdas.b$lambda0, lambdas.b$lambda1)
 
 ## 4. ----
 
+# Log-likelihood
 log.lik <- function(lambdas){
   l0 <- lambdas[1]
   l1 <- lambdas[2]
-  
   M0 <- which(u == 0)
   M1 <- which(u == 1)
-  
-  n <- length(z)
-  e0 <- exp(-l0*z)
-  e1 <- exp(-l1*z)
-  return(n*(log(l0*l1) - log(l0 + l1)) + sum(log(e0*(1 - e1) + e1*(1 - e0))))
+  return(length(M0)*log(l1) + sum(log(1 - exp(-l0*z[M0])) - l1*z[M0]) + 
+           length(M1)*log(l0) + sum(log(1 - exp(-l1*z[M1])) - l0*z[M1]))
 }
+
 
 log.lik2 <- function(lambdas){
-  idx_u_0 = which(u == 0)
-  idx_u_1 = which(u == 1)
-  n0 = length(idx_u_0)
-  n1 = length(idx_u_1)
-  ll = n0 * log(lambdas[2])+n1*log(lambdas[1]) +
-    sum(log(1-exp(-lambdas[1]*z[idx_u_0])) - lambdas[2]*z[idx_u_0]) +
-    sum(log(1-exp(-lambdas[2]*z[idx_u_1])) - lambdas[1]*z[idx_u_1])
+  l0 <- lambdas[1]
+  l1 <- lambdas[2]
+  M0 <- which(u == 0)
+  M1 <- which(u == 1)
+  n <- length(z)
+  return(-n*log(l0 + l1) + n*log(l1) + sum(log(1 - exp(-l0*z[M0])) - l1*z[M0]) + 
+           n*log(l0) + sum(log(1 - exp(-l1*z[M1])) - l0*z[M1]))
 }
 
-mle <- optim(par = c(3,9), fn = log.lik, control = list(fnscale = -1))
-mle
+# Run optimization
+mle <- optim(par = c(1,1), fn = log.lik2, control = list(fnscale = -1))
+mle$par
+
+em <- EM.alg(z, u, 3.512292, 9.169136, tol = 1e-14)
+log.lik2(c(3.465735, 9.353215))
+log.lik2(mle$par)
