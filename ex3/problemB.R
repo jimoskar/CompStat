@@ -35,3 +35,14 @@ for(i in 1:n){
 }
 
 sum(F.samples >= Fval)/n # p-value
+
+# Create histogram
+F.right <- F.samples[which(F.samples >= Fval)]
+F.left <- setdiff(F.samples, F.right)
+F.df <- data.frame(F.vals = c(F.left, F.right), 
+                   ind = as.factor(c(rep( "< Fval", length(F.left)),rep( "> Fval", length(F.right)))))
+ggplot(F.df) + 
+  geom_histogram(aes(x = F.vals, colour = ind), binwidth = 0.1, fill = "white") +
+  xlab("F-values") + ylab("Count") +
+  theme_minimal() +  theme(legend.title=element_blank())
+ggsave("figures/F-vals.pdf", width = 7, height = 4)
