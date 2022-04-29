@@ -81,7 +81,7 @@ sdev <- c(sd(lambda0.b), sd(lambda1.b))
 bias <- c(mean(lambda0.b) - tail(MLE$lambda0, 1),
           mean(lambda1.b) - tail(MLE$lambda1, 1))
 boot.df <- data.frame(sdev, bias)
-xtable(boot.df)
+xtable(boot.df, digits = 4)
 
 # Find correlation
 cor(lambdas.b$lambda0, lambdas.b$lambda1)
@@ -98,21 +98,6 @@ log.lik <- function(lambdas){
            length(M1)*log(l0) + sum(log(1 - exp(-l1*z[M1])) - l0*z[M1]))
 }
 
-
-log.lik2 <- function(lambdas){
-  l0 <- lambdas[1]
-  l1 <- lambdas[2]
-  M0 <- which(u == 0)
-  M1 <- which(u == 1)
-  n <- length(z)
-  return(-n*log(l0 + l1) + n*log(l1) + sum(log(1 - exp(-l0*z[M0])) - l1*z[M0]) + 
-           n*log(l0) + sum(log(1 - exp(-l1*z[M1])) - l0*z[M1]))
-}
-
 # Run optimization
 mle <- optim(par = c(1,1), fn = log.lik2, control = list(fnscale = -1))
 mle$par
-
-em <- EM.alg(z, u, 3.512292, 9.169136, tol = 1e-14)
-log.lik2(c(3.465735, 9.353215))
-log.lik2(mle$par)
